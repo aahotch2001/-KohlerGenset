@@ -391,7 +391,8 @@ fun GeneratorAppScreen() {
             modifier = Modifier
                 .padding(innerPadding)
                 .padding(16.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // GAUGES ROW (Oil, Water, Battery)
@@ -440,8 +441,6 @@ fun GeneratorAppScreen() {
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
 
             // FUEL LEVEL & CONSUMPTION CARD
             Surface(
@@ -496,7 +495,7 @@ fun GeneratorAppScreen() {
                     onClick = { pendingCommand = "START" },
                     modifier = Modifier
                         .weight(1f)
-                        .height(100.dp),
+                        .height(75.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color(0xFF1B3B22),
@@ -505,7 +504,7 @@ fun GeneratorAppScreen() {
                     border = null
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("START", fontSize = MaterialTheme.typography.titleLarge.fontSize, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("START", fontSize = MaterialTheme.typography.titleMedium.fontSize, color = Color.White, fontWeight = FontWeight.Bold)
                         Text("Start Generator", fontSize = MaterialTheme.typography.bodySmall.fontSize, color = Color.LightGray)
                     }
                 }
@@ -515,7 +514,7 @@ fun GeneratorAppScreen() {
                     onClick = { pendingCommand = "STOP" },
                     modifier = Modifier
                         .weight(1f)
-                        .height(100.dp),
+                        .height(75.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color(0xFF5C2323),
@@ -524,7 +523,7 @@ fun GeneratorAppScreen() {
                     border = null
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("STOP", fontSize = MaterialTheme.typography.titleLarge.fontSize, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("STOP", fontSize = MaterialTheme.typography.titleMedium.fontSize, color = Color.White, fontWeight = FontWeight.Bold)
                         Text("Stop Generator", fontSize = MaterialTheme.typography.bodySmall.fontSize, color = Color.LightGray)
                     }
                 }
