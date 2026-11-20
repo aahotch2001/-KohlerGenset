@@ -113,8 +113,8 @@ fun GeneratorAppScreen() {
     val coroutineScope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE) }
 
-    // Mosquitto Broker Settings State
-    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "192.168.1.172") ?: "192.168.1.172") }
+    // Mosquitto Broker Settings State (Tailscale 5G Remote & Local IP: 100.108.173.127)
+    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "100.108.173.127") ?: "100.108.173.127") }
     var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "YOUR_MQTT_USER") ?: "YOUR_MQTT_USER") }
     var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "YOUR_MQTT_PASS") ?: "YOUR_MQTT_PASS") }
     var showSettingsDialog by remember { mutableStateOf(false) }
