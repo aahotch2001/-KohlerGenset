@@ -7,7 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +53,12 @@ fun GeneratorAppScreen() {
     var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "YOUR_MQTT_USER") ?: "YOUR_MQTT_USER") }
     var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "YOUR_MQTT_PASS") ?: "YOUR_MQTT_PASS") }
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    // Thermostat & Heater Custom Settings State
+    var autoHeaterEnabled by remember { mutableStateOf(prefs.getBoolean("auto_heater_enable", true)) }
+    var heaterOnTemp by remember { mutableStateOf(prefs.getString("heater_on_temp", "38") ?: "38") }
+    var heaterOffTemp by remember { mutableStateOf(prefs.getString("heater_off_temp", "50") ?: "50") }
+    var heaterMaxMins by remember { mutableStateOf(prefs.getString("heater_max_mins", "120") ?: "120") }
 
     // Live Telemetry States
     var oilPressure by remember { mutableStateOf("0") }
@@ -194,6 +202,22 @@ fun GeneratorAppScreen() {
         }
     }
 
+    fun publishHeaterConfig() {
+        val client = mqttClient
+        if (client != null && client.isConnected) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    client.publish("kohler/heater-auto-enable", MqttMessage((if (autoHeaterEnabled) "ON" else "OFF").toByteArray()))
+                    client.publish("kohler/heater-set-on-temp", MqttMessage(heaterOnTemp.toByteArray()))
+                    client.publish("kohler/heater-set-off-temp", MqttMessage(heaterOffTemp.toByteArray()))
+                    client.publish("kohler/heater-set-max-mins", MqttMessage(heaterMaxMins.toByteArray()))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     fun toggleCoolantHeater(enabled: Boolean) {
         val client = mqttClient
         if (client != null && client.isConnected) {
@@ -207,6 +231,12 @@ fun GeneratorAppScreen() {
                 }
             }
         }
+    }
+
+    fun toggleAutoHeater(enabled: Boolean) {
+        autoHeaterEnabled = enabled
+        prefs.edit().putBoolean("auto_heater_enable", enabled).apply()
+        publishHeaterConfig()
     }
 
     Scaffold(
@@ -479,32 +509,59 @@ fun GeneratorAppScreen() {
                 }
             }
 
-            // 120V COOLANT HEATER CARD
+            // 120V COOLANT HEATER CONTROL CARD
             Surface(
                 color = Color(0xFF1E1E1E),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("120V Coolant Heater", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        val statusDesc = if (coolantHeaterOn) "HEATER ACTIVE (Auto < 38°F or Manual)" else "OFF (Auto-Protect Standby < 38°F)"
-                        Text(statusDesc, color = if (coolantHeaterOn) Color(0xFF4CAF50) else Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("120V Coolant Heater Control", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Manual Pre-Heat Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Manual Pre-Heat", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            val statusDesc = if (coolantHeaterOn) "HEATER ACTIVE" else "OFF"
+                            Text(statusDesc, color = if (coolantHeaterOn) Color(0xFF4CAF50) else Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                        }
+                        Switch(
+                            checked = coolantHeaterOn,
+                            onCheckedChange = { isChecked ->
+                                coolantHeaterOn = isChecked
+                                toggleCoolantHeater(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
+                        )
                     }
-                    Switch(
-                        checked = coolantHeaterOn,
-                        onCheckedChange = { isChecked ->
-                            coolantHeaterOn = isChecked
-                            toggleCoolantHeater(isChecked)
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
-                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0xFF333333))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Auto Thermostat Protection Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Auto-Freeze Thermostat", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("Auto < ${heaterOnTemp}°F ➔ ${heaterOffTemp}°F (Max ${heaterMaxMins}m)", color = Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                        }
+                        Switch(
+                            checked = autoHeaterEnabled,
+                            onCheckedChange = { isChecked ->
+                                toggleAutoHeater(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
+                        )
+                    }
                 }
             }
         }
@@ -545,14 +602,17 @@ fun GeneratorAppScreen() {
             )
         }
 
-        // --- SETTINGS DIALOG (MOSQUITTO BROKER CREDENTIALS) ---
+        // --- SETTINGS DIALOG (MOSQUITTO BROKER & THERMOSTAT TUNING) ---
         if (showSettingsDialog) {
             AlertDialog(
                 onDismissRequest = { showSettingsDialog = false },
-                title = { Text("Mosquitto MQTT Settings", color = Color.White) },
+                title = { Text("Settings & Thermostat Tuning", color = Color.White) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Enter your Mosquitto broker details:", color = Color.LightGray)
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Mosquitto MQTT Broker:", color = Color.White, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
                             value = mqttHost,
                             onValueChange = { mqttHost = it },
@@ -571,6 +631,28 @@ fun GeneratorAppScreen() {
                             label = { Text("MQTT Password") },
                             singleLine = true
                         )
+
+                        HorizontalDivider(color = Color(0xFF333333))
+                        Text("120V Coolant Heater Thermostat:", color = Color.White, fontWeight = FontWeight.Bold)
+
+                        OutlinedTextField(
+                            value = heaterOnTemp,
+                            onValueChange = { heaterOnTemp = it },
+                            label = { Text("Low Temp Turn-ON (°F)") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = heaterOffTemp,
+                            onValueChange = { heaterOffTemp = it },
+                            label = { Text("High Temp Turn-OFF (°F)") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = heaterMaxMins,
+                            onValueChange = { heaterMaxMins = it },
+                            label = { Text("Max Run Time (Minutes)") },
+                            singleLine = true
+                        )
                     }
                 },
                 confirmButton = {
@@ -579,11 +661,15 @@ fun GeneratorAppScreen() {
                             .putString("mqtt_host", mqttHost.trim())
                             .putString("mqtt_user", mqttUsername.trim())
                             .putString("mqtt_pass", mqttPassword.trim())
+                            .putString("heater_on_temp", heaterOnTemp.trim())
+                            .putString("heater_off_temp", heaterOffTemp.trim())
+                            .putString("heater_max_mins", heaterMaxMins.trim())
                             .apply()
                         showSettingsDialog = false
                         connectMqtt()
+                        publishHeaterConfig()
                     }) {
-                        Text("Save & Connect")
+                        Text("Save & Apply")
                     }
                 },
                 containerColor = Color(0xFF1E1E1E)
