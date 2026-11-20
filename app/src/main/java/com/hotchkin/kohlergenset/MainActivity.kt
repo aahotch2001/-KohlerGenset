@@ -46,10 +46,10 @@ fun GeneratorAppScreen() {
     val coroutineScope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE) }
 
-    // Mosquitto Broker Settings State
+    // Mosquitto Broker Settings State (Default placeholders for public safety)
     var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "192.168.1.172") ?: "192.168.1.172") }
-    var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "aahotch2001") ?: "aahotch2001") }
-    var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "aaronjulie") ?: "aaronjulie") }
+    var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "YOUR_MQTT_USER") ?: "YOUR_MQTT_USER") }
+    var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "YOUR_MQTT_PASS") ?: "YOUR_MQTT_PASS") }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
     // Live Telemetry States
