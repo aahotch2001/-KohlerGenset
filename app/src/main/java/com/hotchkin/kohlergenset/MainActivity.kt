@@ -1,10 +1,16 @@
 package com.hotchkin.kohlergenset
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +28,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.hotchkin.kohlergenset.ui.theme.KohlerGensetTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,14 +39,70 @@ import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        permissions.entries.forEach {
+            println("Permission ${it.key} = ${it.value}")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Create Notification Channel for Genset Alerts
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "kohler_alerts_channel",
+                "Kohler Genset Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Push notifications for generator start/stop events and out-of-spec fault alerts"
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // Ask for permissions on Android 13+
+        val permissionsToRequest = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+
         setContent {
             KohlerGensetTheme(darkTheme = true) {
                 GeneratorAppScreen()
             }
         }
+    }
+}
+
+fun sendPushNotification(context: Context, title: String, text: String) {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val builder = NotificationCompat.Builder(context, "kohler_alerts_channel")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify((System.currentTimeMillis() % 10000).toInt(), builder.build())
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
@@ -48,7 +113,7 @@ fun GeneratorAppScreen() {
     val coroutineScope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE) }
 
-    // Mosquitto Broker Settings State (Default placeholders for public safety)
+    // Mosquitto Broker Settings State
     var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "192.168.1.172") ?: "192.168.1.172") }
     var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "YOUR_MQTT_USER") ?: "YOUR_MQTT_USER") }
     var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "YOUR_MQTT_PASS") ?: "YOUR_MQTT_PASS") }
@@ -118,15 +183,55 @@ fun GeneratorAppScreen() {
                         
                         coroutineScope.launch(Dispatchers.Main) {
                             when (topicName) {
-                                "kohler/oil-pressure" -> oilPressure = payload
-                                "kohler/water-temp" -> waterTemp = payload
-                                "kohler/battery-voltage" -> batteryVoltage = payload
-                                "kohler/solar-battery-48v" -> solarBattery48v = payload
-                                "kohler/fuel-level" -> fuelLevelPct = payload
+                                "kohler/oil-pressure" -> {
+                                    oilPressure = payload
+                                    val psi = payload.toFloatOrNull() ?: 0f
+                                    if (generatorStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f) {
+                                        sendPushNotification(context, "⚠️ CRITICAL: Low Oil Pressure", "Oil pressure dropped to $payload PSI!")
+                                    }
+                                }
+                                "kohler/water-temp" -> {
+                                    waterTemp = payload
+                                    val temp = payload.toFloatOrNull() ?: 0f
+                                    if (generatorStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f) {
+                                        sendPushNotification(context, "⚠️ CRITICAL: Engine Overheating", "Water temp reached $payload °F!")
+                                    }
+                                }
+                                "kohler/battery-voltage" -> {
+                                    batteryVoltage = payload
+                                    val v12 = payload.toFloatOrNull() ?: 0f
+                                    if (v12 < 11.8f && v12 > 5.0f) {
+                                        sendPushNotification(context, "⚠️ BATTERY WARNING", "12V Starter Battery low ($payload V)!")
+                                    }
+                                }
+                                "kohler/solar-battery-48v" -> {
+                                    solarBattery48v = payload
+                                    val v48 = payload.toFloatOrNull() ?: 0f
+                                    if (v48 < 48.0f && v48 > 10.0f) {
+                                        sendPushNotification(context, "⚠️ SOLAR BANK WARNING", "48V Battery Bank low ($payload V)!")
+                                    }
+                                }
+                                "kohler/fuel-level" -> {
+                                    fuelLevelPct = payload
+                                    val pct = payload.toFloatOrNull() ?: 0f
+                                    if (pct < 15.0f && pct > 0f) {
+                                        sendPushNotification(context, "⛽ FUEL WARNING", "Fuel Tank low ($payload %)!")
+                                    }
+                                }
                                 "kohler/burn-rate" -> burnRateGph = payload
                                 "kohler/lifetime-fuel" -> lifetimeFuelGal = payload
                                 "kohler/engine-rpm" -> engineRpm = payload
-                                "kohler/generator-status" -> generatorStatus = payload
+                                "kohler/generator-status" -> {
+                                    val oldStatus = generatorStatus
+                                    generatorStatus = payload
+                                    if (!oldStatus.contains("CONNECTING") && oldStatus != payload) {
+                                        if (payload.contains("RUNNING", ignoreCase = true)) {
+                                            sendPushNotification(context, "🟢 Generator Started", payload)
+                                        } else if (payload.equals("STOPPED", ignoreCase = true)) {
+                                            sendPushNotification(context, "🔴 Generator Stopped", "Kohler 60kW Genset is now STOPPED")
+                                        }
+                                    }
+                                }
                                 "kohler/coolant-heater" -> coolantHeaterOn = payload.contains("ON", ignoreCase = true)
                             }
                         }
@@ -171,6 +276,22 @@ fun GeneratorAppScreen() {
         connectMqtt()
     }
 
+    fun publishHeaterConfig() {
+        val client = mqttClient
+        if (client != null && client.isConnected) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    client.publish("kohler/heater-auto-enable", MqttMessage((if (autoHeaterEnabled) "ON" else "OFF").toByteArray()))
+                    client.publish("kohler/heater-set-on-temp", MqttMessage(heaterOnTemp.toByteArray()))
+                    client.publish("kohler/heater-set-off-temp", MqttMessage(heaterOffTemp.toByteArray()))
+                    client.publish("kohler/heater-set-max-mins", MqttMessage(heaterMaxMins.toByteArray()))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     fun sendCommand(cmd: String) {
         val client = mqttClient
         if (client != null && client.isConnected) {
@@ -198,22 +319,6 @@ fun GeneratorAppScreen() {
             coroutineScope.launch(Dispatchers.Main) {
                 generatorStatus = "NOT CONNECTED"
                 showSettingsDialog = true
-            }
-        }
-    }
-
-    fun publishHeaterConfig() {
-        val client = mqttClient
-        if (client != null && client.isConnected) {
-            coroutineScope.launch(Dispatchers.IO) {
-                try {
-                    client.publish("kohler/heater-auto-enable", MqttMessage((if (autoHeaterEnabled) "ON" else "OFF").toByteArray()))
-                    client.publish("kohler/heater-set-on-temp", MqttMessage(heaterOnTemp.toByteArray()))
-                    client.publish("kohler/heater-set-off-temp", MqttMessage(heaterOffTemp.toByteArray()))
-                    client.publish("kohler/heater-set-max-mins", MqttMessage(heaterMaxMins.toByteArray()))
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
             }
         }
     }
