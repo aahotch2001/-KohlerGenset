@@ -1,0 +1,95 @@
+================================================================================
+        KOHLER 60kW GENSET + WT32-ETH01 BUILT-IN LAN MASTER WIRING BLUEPRINT
+================================================================================
+
+--------------------------------------------------------------------------------
+1. WIRE COLOR CODE CONVENTION
+--------------------------------------------------------------------------------
+[RED]          = +5V DC Regulated Power
+[BLACK]        = Common Ground (GND - All grounds tied together)
+[DARK RED]     = +12V DC Battery Power (Fused)
+[ORANGE]       = +48V DC Solar Battery Positive Line
+[YELLOW]       = Analog Sensor Signals (Oil, Temp, Fuel, Battery Sense)
+[BLUE]         = Relay & Optocoupler Digital Control Signals
+[GREEN]        = I2C Data Line (SDA)
+[WHITE]        = I2C Clock Line (SCL)
+[RJ45]         = Hardwired Ethernet Cable to Router/Switch
+
+--------------------------------------------------------------------------------
+2. POWER SUPPLY & DISTRIBUTION BLOCK
+--------------------------------------------------------------------------------
+A. DROK LM2596 Buck Converter (Set output to EXACTLY 5.0V DC):
+   - IN+  <-- [DARK RED] 12V Battery (+) via [5A Inline Fuse] from Generator Battery
+   - IN-  <-- [BLACK] 12V Battery (-) Ground from Generator Battery
+   - OUT+ --> [RED] 5.0V Output to [Soldered 5V Power Bus Rail]
+   - OUT- --> [BLACK] Ground Output to [Soldered Common Ground Bus Rail]
+
+B. Soldered Power Bus Rail Connections:
+   - Soldered 5V Bus Rail (Red): Supplies 5V Power to WT32-ETH01, ADS1115, Relays, Fuel Transducer.
+   - Soldered GND Bus Rail (Black): Connects ALL Grounds together (WT32-ETH01, Sensors, Inverter, Kohler Panel).
+
+--------------------------------------------------------------------------------
+3. WT32-ETH01 BOARD POWER & DATA CONNECTIONS
+--------------------------------------------------------------------------------
+Power Connections:
+   - Terminal [5V]  <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Terminal [GND] <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+
+Ethernet Port:
+   - Onboard RJ45 Jack --> Plug standard Cat5e/Cat6 cable directly into router/switch (Mosquitto Broker: 192.168.65.91)
+
+I2C Bus (ADS1115 ADC):
+   - Terminal [GPIO 32] --> [GREEN] Wire to ADS1115 [SDA]
+   - Terminal [GPIO 33] --> [WHITE] Wire to ADS1115 [SCL]
+
+Optocoupler Inputs (PC817 Board Outputs - Open Collector Ground Switching):
+   - Terminal [GPIO 35] <-- [BLUE] Wire from PC817 Pin [O1] (Alternator 'W' Terminal Engine Running Sense)
+   - Terminal [GPIO 36] <-- [BLUE] Wire from PC817 Pin [O2] (EG4 18kPV Auto-Start Signal)
+   - Terminal [GPIO 39] <-- [BLUE] Wire from PC817 Pin [O3] (AC Frequency / Engine RPM)
+
+Relay Control Outputs (Songle Relay & SSR-40DA):
+   - Terminal [GPIO 4]  --> [BLUE] Wire to Songle Relay 1 [IN1] (Remote Start Command)
+   - Terminal [GPIO 12] --> [BLUE] Wire to SSR-40DA [Pin 3 DC+] (120V Coolant Heater Control)
+
+--------------------------------------------------------------------------------
+4. ADS1115 16-BIT PRECISION ADC MODULE
+--------------------------------------------------------------------------------
+Power Connections:
+   - Pin [VDD]      <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Pin [GND]      <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+   - Pin [SDA]      <-- [GREEN] Wire from WT32-ETH01 [GPIO 32]
+   - Pin [SCL]      <-- [WHITE] Wire from WT32-ETH01 [GPIO 33]
+
+Analog Sensor Channel Inputs:
+   - Pin [A0] (Oil Pressure):
+     <-- [YELLOW] Wire tapped from Kohler Panel Oil Pressure Gauge Terminal [S] via [10k Ohm Resistor]
+     * [22k Ohm Resistor] from Pin A0 to [Soldered Common Ground Bus Rail]
+     * [0.1uF / 104 Ceramic Capacitor] between A0 and GND for noise filtering.
+
+   - Pin [A1] (Water Temp):
+     <-- [YELLOW] Wire tapped from Kohler Panel Water Temp Gauge Terminal [S] via [10k Ohm Resistor]
+     * [22k Ohm Resistor] from Pin A1 to [Soldered Common Ground Bus Rail]
+     * [0.1uF / 104 Ceramic Capacitor] between A1 and GND for noise filtering.
+
+   - Pin [A2] (12V Starter Battery Voltage Sense):
+     <-- [YELLOW] Wire from 12V Battery (+) via Resistor Voltage Divider:
+     * 10k Ohm Resistor from 12V(+) line to Pin A2
+     * 2.2k Ohm Resistor from Pin A2 to [Soldered Common Ground Bus Rail]
+
+   - Pin [A3] (48V Solar Battery Bank Voltage Sense):
+     <-- [YELLOW] Wire from 48V Solar Battery Bank (+) 14-2 Romex wire via Resistor Divider:
+     * 47k Ohm Resistor from 48V(+) line to Pin A3
+     * 2.7k Ohm Resistor from Pin A3 to [Soldered Common Ground Bus Rail]
+
+--------------------------------------------------------------------------------
+5. KOHLER PANEL 3-TERMINAL ANALOG GAUGES PINOUT
+--------------------------------------------------------------------------------
+Each analog gauge on the Kohler Decision Maker 3 panel has 3 rear terminals:
+   - Terminal [I] (or "+"): 12V Switched Power from Panel (DO NOT TOUCH)
+   - Terminal [G] (or "-"): Panel Ground (DO NOT TOUCH)
+   - Terminal [S] (SENDER): THIS IS THE SIGNAL TERMINAL YOU TAP INTO!
+
+Tapping Instructions:
+   - Oil Pressure Gauge: Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to ADS1115 [A0]
+   - Water Temp Gauge:   Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to ADS1115 [A1]
+   - Hertz / Frequency:  Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to PC817 [Ch 3 IN]
