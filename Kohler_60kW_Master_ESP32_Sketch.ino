@@ -25,21 +25,25 @@ const float TANK_CAPACITY_GALLONS = 100.0;
 #define RELAY_ON  LOW
 #define RELAY_OFF HIGH
 
-// Set to true when EG4 18kPV inverter wire is attached to GPIO 18 (set false for bench testing)
+// Set to true when EG4 18kPV inverter wire is attached to GPIO 19 (set false for bench testing)
 #define ENABLE_EG4_INVERTER_AUTOSTART false
 
 // =================================================================
-// 2. ELEGOO ESP-32 USB-C HARDWARE PIN DEFINITIONS
+// 2. ELEGOO ESP-32 HARDWARE PIN DEFINITIONS (USER BREAKOUT BOARD)
 // =================================================================
-#define SDA_PIN 21 // Standard Hardware I2C SDA -> ADS1115 SDA (Pin D21 / G21)
-#define SCL_PIN 22 // Standard Hardware I2C SCL -> ADS1115 SCL (Pin D22 / G22)
+#define SDA_PIN 21 // Native Hardware I2C SDA -> ADS1115 SDA (Pin D21)
+#define SCL_PIN 22 // Native Hardware I2C SCL -> ADS1115 SCL (Pin D22)
 
-#define RELAY_START_PIN   4  // GPIO 4  -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin D4)
-#define RELAY_HEATER_PIN  2  // GPIO 2  -> Songle Relay IN2 (120V Coolant Heater - Pin D2)
-#define VICTRON_CHARGER_PIN 27 // GPIO 27 -> Direct 3.3V Signal to Victron Remote Pin 'H' (Pin D27)
+#define RELAY_START_PIN     26 // GPIO 26 -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin D26)
+#define RELAY_HEATER_PIN    27 // GPIO 27 -> Songle Relay IN2 (120V Coolant Heater - Pin D27)
+#define VICTRON_CHARGER_PIN 4  // GPIO 4  -> Direct 3.3V Signal to Victron Remote Pin 'H' (Pin D4)
+#define DS18B20_TEMP_PIN    25 // GPIO 25 -> DS18B20 3-Wire Digital Temp Sensor (Pin D25)
 
-#define OPT_RPM_SENSE_PIN 5  // GPIO 5  -> PC817 Ch1 Output (Alternator Terminal W RPM - Pin D5)
-#define OPT_18KPV_PIN     18 // GPIO 18 -> PC817 Ch2 Output (EG4 Inverter Auto-Start - Pin D18)
+#define OPT_RPM_SENSE_PIN   18 // GPIO 18 -> PC817 Ch1 Output (Alternator Terminal W RPM - Pin D18)
+#define OPT_18KPV_PIN       19 // GPIO 19 -> PC817 Ch2 Output (EG4 Inverter Auto-Start - Pin D19)
+
+// W5500 SPI Ethernet Module Pins (Reference):
+// SCLK = Pin D14 (GPIO 14), MOSI = Pin D23 (GPIO 23), SCS/CS = Pin D5 (GPIO 5)
 
 // =================================================================
 // 3. HARDWARE INTERRUPT PULSE COUNTER
@@ -346,7 +350,7 @@ void loop() {
       autoHeaterOn = false;
     }
 
-    // Drive Coolant Heater Relay Output (GPIO 2)
+    // Drive Coolant Heater Relay Output (GPIO 27)
     bool finalHeaterState = manualHeaterOn || autoHeaterOn;
     digitalWrite(RELAY_HEATER_PIN, finalHeaterState ? RELAY_ON : RELAY_OFF);
 
@@ -361,7 +365,7 @@ void loop() {
       autoChargerOn = false;
     }
 
-    // Drive Victron Remote Pin 'H' Output (GPIO 27)
+    // Drive Victron Remote Pin 'H' Output (GPIO 4)
     bool finalChargerState = manualChargerOn || autoChargerOn;
     digitalWrite(VICTRON_CHARGER_PIN, finalChargerState ? HIGH : LOW);
 
@@ -379,3 +383,4 @@ void loop() {
     client.publish(topicCharger, finalChargerState ? "ON" : "OFF");
   }
 }
+```
