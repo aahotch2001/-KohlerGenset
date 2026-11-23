@@ -231,6 +231,7 @@ Alternator W:    1k Ω series resistor + 1N4007 protection diode
             <li><b>START:</b> Relays engage ➔ Status shows <code>CRANKING</code> ➔ Terminal W confirms <code>RPM > 400</code> ➔ Status turns to <code>RUNNING</code>.</li>
             <li><b>STOP:</b> Relay disengages immediately ➔ Engine runs down Kohler internal cooldown (<code>COOLDOWN</code>) ➔ <code>RPM == 0</code> ➔ Status turns to <code>STOPPED</code>.</li>
             <li><b>15s Over-crank Safety:</b> If starter cranks >15 seconds without engine firing, relay automatically disengages.</li>
+            <li><b>Smart Victron 12V Charger:</b> Turns ON when 12V Starter Battery drops below <code>12.3V</code>, and turns OFF when charged to <code>13.8V</code> (0mA 48V standby drain).</li>
         </ul>
     </div>
 

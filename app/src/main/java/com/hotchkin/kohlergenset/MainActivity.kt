@@ -176,6 +176,7 @@ fun GeneratorAppScreen() {
     var engineRpm by remember { mutableStateOf("0") }
     var generatorStatus by remember { mutableStateOf("STOPPED") }
     var coolantHeaterOn by remember { mutableStateOf(false) }
+    var victronChargerOn by remember { mutableStateOf(false) }
     var lastCommand by remember { mutableStateOf("") }
     var lastCommandTime by remember { mutableStateOf(0L) }
 
@@ -298,6 +299,7 @@ fun GeneratorAppScreen() {
                                                 }
                                             }
                                             "kohler/coolant-heater" -> coolantHeaterOn = payload.contains("ON", ignoreCase = true)
+                                            "kohler/victron-charger" -> victronChargerOn = payload.contains("ON", ignoreCase = true)
                                         }
                                     }
                                 }
@@ -329,7 +331,8 @@ fun GeneratorAppScreen() {
                         "kohler/lifetime-fuel",
                         "kohler/engine-rpm",
                         "kohler/generator-status",
-                        "kohler/coolant-heater"
+                        "kohler/coolant-heater",
+                        "kohler/victron-charger"
                     )
                     connectedClient.subscribe(topics)
 
@@ -408,6 +411,21 @@ fun GeneratorAppScreen() {
             coroutineScope.launch(Dispatchers.IO) {
                 try {
                     val topic = "kohler/coolant-heater-cmd"
+                    val message = MqttMessage((if (enabled) "ON" else "OFF").toByteArray())
+                    client.publish(topic, message)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    fun toggleVictronCharger(enabled: Boolean) {
+        val client = mqttClient
+        if (client != null && client.isConnected) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val topic = "kohler/victron-charger-cmd"
                     val message = MqttMessage((if (enabled) "ON" else "OFF").toByteArray())
                     client.publish(topic, message)
                 } catch (e: Exception) {
@@ -743,6 +761,38 @@ fun GeneratorAppScreen() {
                             checked = autoHeaterEnabled,
                             onCheckedChange = { isChecked ->
                                 toggleAutoHeater(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
+                        )
+                    }
+                }
+            }
+
+            // VICTRON 48V-TO-12V SMART CHARGER CARD
+            Surface(
+                color = Color(0xFF1E1E1E),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Victron 48V-to-12V Smart Charger", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("12V Charger Control", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            val chargerDesc = if (victronChargerOn) "CHARGING (< 12.3V ➔ 13.8V)" else "OFF (0mA 48V Standby Drain)"
+                            Text(chargerDesc, color = if (victronChargerOn) Color(0xFF4CAF50) else Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                        }
+                        Switch(
+                            checked = victronChargerOn,
+                            onCheckedChange = { isChecked ->
+                                victronChargerOn = isChecked
+                                toggleVictronCharger(isChecked)
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
                         )
