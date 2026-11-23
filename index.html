@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kohler 60kW Genset — Control & Service Portal</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --card-bg: #1e1e1e;
+            --accent-green: #4CAF50;
+            --accent-amber: #FF9800;
+            --text-main: #ffffff;
+            --text-sub: #b0b0b0;
+            --border-color: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin: 0 0 8px 0;
+            color: var(--text-main);
+        }
+
+        .header p {
+            margin: 0;
+            color: var(--text-sub);
+            font-size: 14px;
+        }
+
+        .btn-download {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #1b3b22;
+            color: #ffffff;
+            border: 2px solid var(--accent-green);
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: none;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .btn-download:active {
+            transform: scale(0.98);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-top: 0;
+            color: var(--accent-green);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        code {
+            background-color: #2a2a2a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ffcc80;
+        }
+
+        .diagram {
+            background-color: #121212;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            color: #81c784;
+            border: 1px solid #2a2a2a;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>⚙️ Kohler 60kW Genset</h1>
+        <p>Remote Control, Telemetry & Service Portal</p>
+    </div>
+
+    <!-- APK DOWNLOAD BUTTON -->
+    <a href="app-debug.apk" class="btn-download" download>
+        📱 Download Phone Control App (.apk)
+    </a>
+
+    <!-- SYSTEM OVERVIEW CARD -->
+    <div class="card">
+        <h2>🌐 Network & Broker Details</h2>
+        <table>
+            <tr>
+                <th>Setting</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Mosquitto Local IP</td>
+                <td><code>192.168.68.91:1883</code></td>
+            </tr>
+            <tr>
+                <td>Tailscale 5G IP</td>
+                <td><code>100.108.173.127:1883</code></td>
+            </tr>
+            <tr>
+                <td>MQTT Login</td>
+                <td><code>aahotch2001</code> / <code>aaronjulie</code></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- HARDWARE PINOUT CARD -->
+    <div class="card">
+        <h2>⚡ ESP32 Hardware Pinout</h2>
+        <table>
+            <tr>
+                <th>Feature</th>
+                <th>Pin</th>
+                <th>Function</th>
+            </tr>
+            <tr>
+                <td>Start Relay</td>
+                <td><code>IO4</code> / <code>D4</code></td>
+                <td>Songle Relay IN1 (Kohler Terminals 3 & 4)</td>
+            </tr>
+            <tr>
+                <td>Coolant Heater Relay</td>
+                <td><code>IO2</code> / <code>D2</code></td>
+                <td>Songle Relay IN2 (+5V to SSR-40DA)</td>
+            </tr>
+            <tr>
+                <td>Alternator RPM Sense</td>
+                <td><code>RXD</code> / <code>D5</code></td>
+                <td>PC817 Ch1 Output (Alternator Terminal W)</td>
+            </tr>
+            <tr>
+                <td>Inverter Auto-Start</td>
+                <td><code>IO36</code> / <code>D18</code></td>
+                <td>PC817 Ch2 Output (EG4 18kPV)</td>
+            </tr>
+            <tr>
+                <td>I2C SDA (ADC)</td>
+                <td><code>IO14</code> / <code>D21</code></td>
+                <td>ADS1115 ADC Data Line</td>
+            </tr>
+            <tr>
+                <td>I2C SCL (ADC)</td>
+                <td><code>IO15</code> / <code>D22</code></td>
+                <td>ADS1115 ADC Clock Line</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- SENSOR CALIBRATION CARD -->
+    <div class="card">
+        <h2>🧮 Sensor Calibration Formulas</h2>
+        <div class="diagram">
+12V Battery:     volts2 * 6.047 (10k / 2.2k divider)
+48V Solar Bank:  volts3 * (46.7 / 2.7) (44k / 2.7k divider)
+Water Temp:      240.0 - (volts1 * 49.0) (Inverse Kohler NTC)
+Oil Pressure:    (volts0 - 0.5) * (100.0 / 4.0)
+Alternator W:    1k Ω series resistor + 1N4007 protection diode
+        </div>
+    </div>
+
+    <!-- OPERATING RULES CARD -->
+    <div class="card">
+        <h2>🛡️ Safety & Operating Rules</h2>
+        <ul>
+            <li><b>START:</b> Relays engage ➔ Status shows <code>CRANKING</code> ➔ Terminal W confirms <code>RPM > 400</code> ➔ Status turns to <code>RUNNING</code>.</li>
+            <li><b>STOP:</b> Relay disengages immediately ➔ Engine runs down Kohler internal cooldown (<code>COOLDOWN</code>) ➔ <code>RPM == 0</code> ➔ Status turns to <code>STOPPED</code>.</li>
+            <li><b>15s Over-crank Safety:</b> If starter cranks >15 seconds without engine firing, relay automatically disengages.</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        Kohler 60kW Genset Master Control System &copy; 2026<br>
+        Hosted on GitHub Pages
+    </div>
+</div>
+
+</body>
+</html>
