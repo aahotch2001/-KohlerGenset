@@ -111,3 +111,15 @@ PC817 Board Output Connections to WT32-ETH01:
    - PC817 [GND] --> [BLACK] Wire to [Soldered Common Ground Bus Rail]
    - PC817 [O1]  --> [BLUE] Wire to WT32-ETH01 Pin [IO35] (Left Row 10th down - Alternator Terminal 'W' RPM)
    - PC817 [O2]  --> [BLUE] Wire to WT32-ETH01 Pin [IO36] (Left Row 6th down - EG4 Inverter Auto-Start)
+
+--------------------------------------------------------------------------------
+7. EXTERNAL 3-WIRE DIGITAL TEMPERATURE SENSOR SCHEMATIC (DS18B20 / OneWire)
+--------------------------------------------------------------------------------
+Power & Data Connections:
+   - [RED Wire]    (VCC)  <-- Connect to ESP32 [3V3] Pin (or 5V Power Bus Rail)
+   - [BLACK Wire]  (GND)  <-- Connect to [Soldered Common Ground Bus Rail]
+   - [YELLOW Wire] (Data) --> Connect to ESP32 Pin [D25] (GPIO 25)
+
+Pull-Up Resistor Requirement:
+   - Install a [4.7k Ohm 1/4W Resistor] connected between the [RED Wire (3.3V)]
+     and the [YELLOW Wire (Data)] right at the sensor termination point.
