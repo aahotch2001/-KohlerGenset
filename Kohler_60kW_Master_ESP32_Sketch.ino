@@ -21,26 +21,36 @@ Preferences prefs;
 const char* WIFI_SSID     = "YOUR_WIFI_NAME";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
-// Local Mosquitto Broker Details (Target IP: 192.168.65.91)
-const char* MQTT_SERVER   = "192.168.65.91";
+// Local Mosquitto Broker Details (Target IP: 192.168.68.91)
+const char* MQTT_SERVER   = "192.168.68.91";
 const int   MQTT_PORT     = 1883;
 const char* MQTT_USER     = "aahotch2001";
 const char* MQTT_PASS     = "aaronjulie";
 
 const float TANK_CAPACITY_GALLONS = 100.0;
 
+// Relay Trigger Logic (Active-LOW Relay Module: LOW ground turns Relay ON, HIGH turns Relay OFF)
+#define RELAY_ON  LOW
+#define RELAY_OFF HIGH
+
+// Set to true when EG4 18kPV inverter wire is attached to GPIO 36 (set false for bench testing)
+#define ENABLE_EG4_INVERTER_AUTOSTART false
+
+// PC817 Optocoupler Engine 70R Logic Level
+// Set to HIGH if optocoupler outputs 3.3V when 12V is present, or LOW if it outputs 0V.
+#define OPT_ENGINE_RUN_LEVEL  HIGH
+
 // =================================================================
 // 2. WT32-ETH01 HARDWARE PIN DEFINITIONS
 // =================================================================
-#define SDA_PIN 32 // I2C SDA -> ADS1115 SDA
-#define SCL_PIN 33 // I2C SCL -> ADS1115 SCL
+#define SDA_PIN 14 // I2C SDA -> ADS1115 SDA (Pin IO14)
+#define SCL_PIN 15 // I2C SCL -> ADS1115 SCL (Pin IO15)
 
-#define RELAY_START_PIN  4  // GPIO 4  -> Songle Relay IN1 (Kohler Terminals 3 & 4)
-#define RELAY_HEATER_PIN 12 // GPIO 12 -> SSR-40DA Solid State Relay (120V Coolant Heater)
+#define RELAY_START_PIN  4 // GPIO 4 -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin IO4)
+#define RELAY_HEATER_PIN 2 // GPIO 2 -> SSR-40DA / Relay Control (Pin IO2)
 
-#define OPT_ENGINE_SENSE_PIN  35 // GPIO 35 -> PC817 Ch1 Output (Kohler Terminal 70R)
-#define OPT_18KPV_PIN         36 // GPIO 36 -> PC817 Ch2 Output (EG4 Inverter)
-#define OPT_RPM_SENSE_PIN     39 // GPIO 39 -> PC817 Ch3 Output (AC Frequency / Engine RPM)
+#define OPT_RPM_SENSE_PIN     5  // GPIO 5 -> PC817 Ch1 Output (Alternator Terminal W RPM & Engine Sense - Pin RXD)
+#define OPT_18KPV_PIN         36 // GPIO 36 -> PC817 Ch2 Output (EG4 Inverter - Pin IO36)
 
 // =================================================================
 // 3. HARDWARE INTERRUPT PULSE COUNTER
@@ -146,13 +156,16 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (String(topic) == topicCommand) {
     if (message == "START") {
-      digitalWrite(RELAY_START_PIN, HIGH); // Engage Start Relay
+      digitalWrite(RELAY_START_PIN, RELAY_ON); // Engage Start Relay
       runSource = "App Remote Manual";
-      Serial.println("COMMAND: Engine START Requested");
+      client.publish(topicStatus, "CRANKING");
+      Serial.println("COMMAND: Engine START Requested -> Relay ENGAGED (CRANKING)");
     } else if (message == "STOP") {
-      digitalWrite(RELAY_START_PIN, LOW); // Disengage Start Relay
+      digitalWrite(RELAY_START_PIN, RELAY_OFF); // Disengage Start Relay
       runSource = "Stopped";
-      Serial.println("COMMAND: Engine STOP Requested");
+      isGeneratorRunning = false;
+      client.publish(topicStatus, "STOPPED");
+      Serial.println("COMMAND: Engine STOP Requested -> Relay DISENGAGED (STOPPED)");
     }
   } else if (String(topic) == topicHeaterCmd) {
     if (message == "ON") {
@@ -196,17 +209,25 @@ void setup() {
   // Configure Relays & Optocoupler Pins
   pinMode(RELAY_START_PIN, OUTPUT);
   pinMode(RELAY_HEATER_PIN, OUTPUT);
-  digitalWrite(RELAY_START_PIN, LOW);
-  digitalWrite(RELAY_HEATER_PIN, LOW);
+  digitalWrite(RELAY_START_PIN, RELAY_OFF);
+  digitalWrite(RELAY_HEATER_PIN, RELAY_OFF);
 
-  pinMode(OPT_ENGINE_SENSE_PIN, INPUT);
-  pinMode(OPT_18KPV_PIN, INPUT);
   pinMode(OPT_RPM_SENSE_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, RISING);
+  pinMode(OPT_18KPV_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
+
+  // Enable LAN8720 50MHz Crystal Oscillator Power (GPIO 16)
+  pinMode(ETH_POWER_PIN, OUTPUT);
+  digitalWrite(ETH_POWER_PIN, HIGH);
+  delay(50);
 
   // Initialize WT32-ETH01 LAN8720 Ethernet PHY
   WiFi.onEvent(WiFiEvent);
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ETH.begin(ETH_TYPE, ETH_ADDR, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_POWER_PIN, ETH_CLK_MODE);
+#else
   ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+#endif
 
   // Connect Wi-Fi as Automatic Backup
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -231,7 +252,12 @@ void setup() {
 // =================================================================
 void reconnectMqtt() {
   while (!client.connected()) {
-    Serial.print("Connecting to Mosquitto Broker at 192.168.65.91:1883... ");
+    if (!ethConnected && WiFi.status() != WL_CONNECTED) {
+      Serial.println("Waiting for Ethernet / Wi-Fi IP Address...");
+      delay(2000);
+      continue;
+    }
+    Serial.print("Connecting to Mosquitto Broker at 192.168.68.91:1883... ");
     String clientId = "WT32_Genset_Controller_";
     clientId += String(random(0xffff), HEX);
 
@@ -263,12 +289,13 @@ void loop() {
 
   unsigned long now = millis();
 
-  // Read Sensors & Update Telemetry Every 1 Second
-  if (now - lastSensorReadTime >= 1000) {
+  // Smart Adaptive Telemetry Rate: 1s when running/cranking, 10s when stopped (99% packet/battery saver!)
+  unsigned long telemetryInterval = (isGeneratorRunning || (digitalRead(RELAY_START_PIN) == RELAY_ON)) ? 1000 : 10000;
+
+  if (now - lastSensorReadTime >= telemetryInterval) {
     lastSensorReadTime = now;
 
     // --- A. READ OPTOCOUPLERS ---
-    bool optEngineSense = (digitalRead(OPT_ENGINE_SENSE_PIN) == LOW);
     bool optInverterStart = (digitalRead(OPT_18KPV_PIN) == LOW);
 
     // Calculate RPM & Frequency from Hardware Interrupt
@@ -278,11 +305,28 @@ void loop() {
     interrupts();
     currentRpm = (pulses * 60) / 2; // Assuming 2 pulses per revolution
 
-    isGeneratorRunning = optEngineSense || (currentRpm > 400);
+    // Determine engine state from Alternator Terminal W RPM vs Start Relay
+    bool startRelayEngaged = (digitalRead(RELAY_START_PIN) == RELAY_ON);
+    String currentStatusStr = "STOPPED";
+    if (currentRpm > 400) {
+      isGeneratorRunning = true;
+      if (startRelayEngaged) {
+        currentStatusStr = "RUNNING";
+      } else {
+        // Start relay is disengaged (STOP was pressed), but engine is still spinning in Kohler internal cooldown!
+        currentStatusStr = "COOLDOWN";
+      }
+    } else if (startRelayEngaged) {
+      isGeneratorRunning = false;
+      currentStatusStr = "CRANKING";
+    } else {
+      isGeneratorRunning = false;
+      currentStatusStr = "STOPPED";
+    }
 
-    // Handle Auto-Start from EG4 18kPV Inverter
-    if (optInverterStart && !isGeneratorRunning) {
-      digitalWrite(RELAY_START_PIN, HIGH);
+    // Handle Auto-Start from EG4 18kPV Inverter (disabled on bench to prevent floating pin triggers)
+    if (ENABLE_EG4_INVERTER_AUTOSTART && optInverterStart && !isGeneratorRunning) {
+      digitalWrite(RELAY_START_PIN, RELAY_ON);
       runSource = "EG4 18kPV Auto-Start";
     }
 
@@ -304,15 +348,22 @@ void loop() {
       float volts3 = ads.computeVolts(adc3);
 
       oilPressure = (volts0 - 0.5) * (100.0 / 4.0);
-      if (oilPressure < 0) oilPressure = 0;
+      if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
-      currentWaterTemp = (volts1 * 50.0); // Calibrated temp scale
-      batteryVoltage = volts2 * (15.0 / 3.3); // Resistor divider ratio
-      solar48v = volts3 * (60.0 / 3.3);       // High-voltage divider ratio
+      // Kohler NTC Temp Sender Inverse Calibration (High Voltage = Cold, Low Voltage = Hot)
+      currentWaterTemp = 240.0 - (volts1 * 49.0);
+      if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
+
+      batteryVoltage = volts2 * 6.047;       // Calibrated for 10k/2.2k divider (13.60V actual vs 10.22V displayed)
+      if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
+
+      solar48v = volts3 * (46.7 / 2.7);       // 44k (two 22k in series) + 2.7k divider ratio
+      if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
 
     // --- C. COOLANT HEATER THERMOSTAT CONTROL ---
-    if (autoHeaterEnabled && !isGeneratorRunning) {
+    // Auto-Freeze thermostat only triggers if ADS1115 sensor is present and reading valid temp (>1.0 F)
+    if (autoHeaterEnabled && !isGeneratorRunning && adsPresent && currentWaterTemp > 1.0) {
       if (currentWaterTemp <= heaterOnTemp) {
         if (!autoHeaterOn) {
           autoHeaterOn = true;
@@ -331,12 +382,12 @@ void loop() {
       autoHeaterOn = false;
     }
 
-    // Drive SSR-40DA Solid State Relay Output (GPIO 12)
+    // Drive Coolant Heater Relay Output (GPIO 12)
     bool finalHeaterState = manualHeaterOn || autoHeaterOn;
-    digitalWrite(RELAY_HEATER_PIN, finalHeaterState ? HIGH : LOW);
+    digitalWrite(RELAY_HEATER_PIN, finalHeaterState ? RELAY_ON : RELAY_OFF);
 
     // --- D. PUBLISH LIVE TELEMETRY TO MOSQUITTO BROKER ---
-    client.publish(topicStatus, isGeneratorRunning ? "RUNNING" : "STOPPED");
+    client.publish(topicStatus, currentStatusStr.c_str());
     client.publish(topicOil, String(oilPressure, 1).c_str());
     client.publish(topicTemp, String(currentWaterTemp, 1).c_str());
     client.publish(topicBatt, String(batteryVoltage, 2).c_str());

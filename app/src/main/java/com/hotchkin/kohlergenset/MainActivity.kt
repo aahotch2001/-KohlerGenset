@@ -3,10 +3,16 @@ package com.hotchkin.kohlergenset
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -76,6 +82,18 @@ class MainActivity : ComponentActivity() {
         }
         requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
 
+        // Start 24/7 Ultra-Low Battery Background Monitor Service
+        try {
+            val serviceIntent = Intent(this, GensetMqttService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         setContent {
             KohlerGensetTheme(darkTheme = true) {
                 GeneratorAppScreen()
@@ -113,11 +131,33 @@ fun GeneratorAppScreen() {
     val coroutineScope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE) }
 
-    // Mosquitto Broker Settings State (Local Network Broker: 192.168.65.91 | Tailscale: 100.98.23.73)
-    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "192.168.65.91") ?: "192.168.65.91") }
-    var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "YOUR_MQTT_USER") ?: "YOUR_MQTT_USER") }
-    var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "YOUR_MQTT_PASS") ?: "YOUR_MQTT_PASS") }
+    // Mosquitto Broker Settings State (Local Network Broker: 192.168.68.91 | Tailscale: 100.108.173.127)
+    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "100.108.173.127") ?: "100.108.173.127") }
+    var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "aahotch2001") ?: "aahotch2001") }
+    var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "aaronjulie") ?: "aaronjulie") }
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    // Auto-migrate legacy settings stored on physical phone
+    LaunchedEffect(Unit) {
+        val editor = prefs.edit()
+        var updated = false
+        if (mqttHost == "192.168.65.91") {
+            mqttHost = "192.168.68.91"
+            editor.putString("mqtt_host", "192.168.68.91")
+            updated = true
+        }
+        if (mqttUsername == "YOUR_MQTT_USER") {
+            mqttUsername = "aahotch2001"
+            editor.putString("mqtt_user", "aahotch2001")
+            updated = true
+        }
+        if (mqttPassword == "YOUR_MQTT_PASS") {
+            mqttPassword = "aaronjulie"
+            editor.putString("mqtt_pass", "aaronjulie")
+            updated = true
+        }
+        if (updated) editor.apply()
+    }
 
     // Thermostat & Heater Custom Settings State
     var autoHeaterEnabled by remember { mutableStateOf(prefs.getBoolean("auto_heater_enable", true)) }
@@ -136,6 +176,8 @@ fun GeneratorAppScreen() {
     var engineRpm by remember { mutableStateOf("0") }
     var generatorStatus by remember { mutableStateOf("STOPPED") }
     var coolantHeaterOn by remember { mutableStateOf(false) }
+    var lastCommand by remember { mutableStateOf("") }
+    var lastCommandTime by remember { mutableStateOf(0L) }
 
     // Safety Confirmation Modal States
     var pendingCommand by remember { mutableStateOf<String?>(null) } // "START" or "STOP"
@@ -153,119 +195,161 @@ fun GeneratorAppScreen() {
 
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                mqttClient?.disconnect()
-                mqttClient?.close()
+                try { mqttClient?.disconnect() } catch (ignored: Exception) {}
+                try { mqttClient?.close() } catch (ignored: Exception) {}
+                mqttClient = null
+
+                // Clean host string (strip tcp://, http://, ports, whitespace)
+                val cleanHost = mqttHost.trim()
+                    .removePrefix("tcp://")
+                    .removePrefix("http://")
+                    .removePrefix("https://")
+                    .substringBefore(":")
                 
-                val serverUri = "tcp://$mqttHost:1883"
-                val clientId = "Android_App_" + System.currentTimeMillis()
-                val client = MqttClient(serverUri, clientId, MemoryPersistence())
-                
-                val options = MqttConnectOptions().apply {
+                val hostsToTry = mutableListOf<String>()
+                if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
+                if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
+                if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
+
+                var lastException: Exception? = null
+                var connectedClient: MqttClient? = null
+
+                for (targetHost in hostsToTry) {
+                    val optionsList = mutableListOf<MqttConnectOptions>()
                     if (mqttUsername.isNotEmpty()) {
-                        userName = mqttUsername
-                        password = mqttPassword.toCharArray()
+                        optionsList.add(MqttConnectOptions().apply {
+                            userName = mqttUsername
+                            password = mqttPassword.toCharArray()
+                            isCleanSession = true
+                            connectionTimeout = 2 // Fast 2-second timeout per attempt
+                            keepAliveInterval = 30
+                        })
                     }
-                    isCleanSession = true
-                    connectionTimeout = 10
-                    keepAliveInterval = 30
-                }
+                    optionsList.add(MqttConnectOptions().apply {
+                        isCleanSession = true
+                        connectionTimeout = 2 // Fast 2-second timeout per attempt
+                        keepAliveInterval = 30
+                    })
 
-                client.setCallback(object : MqttCallback {
-                    override fun connectionLost(cause: Throwable?) {
-                        coroutineScope.launch(Dispatchers.Main) {
-                            generatorStatus = "DISCONNECTED"
-                        }
-                    }
+                    for (opts in optionsList) {
+                        try {
+                            val serverUri = "tcp://$targetHost:1883"
+                            val clientId = "Android_App_" + System.currentTimeMillis()
+                            val client = MqttClient(serverUri, clientId, MemoryPersistence())
 
-                    override fun messageArrived(topic: String?, message: MqttMessage?) {
-                        val payload = message?.toString() ?: return
-                        val topicName = topic ?: ""
-                        
-                        coroutineScope.launch(Dispatchers.Main) {
-                            when (topicName) {
-                                "kohler/oil-pressure" -> {
-                                    oilPressure = payload
-                                    val psi = payload.toFloatOrNull() ?: 0f
-                                    if (generatorStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f) {
-                                        sendPushNotification(context, "⚠️ CRITICAL: Low Oil Pressure", "Oil pressure dropped to $payload PSI!")
+                            client.setCallback(object : MqttCallback {
+                                override fun connectionLost(cause: Throwable?) {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        generatorStatus = "DISCONNECTED"
                                     }
                                 }
-                                "kohler/water-temp" -> {
-                                    waterTemp = payload
-                                    val temp = payload.toFloatOrNull() ?: 0f
-                                    if (generatorStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f) {
-                                        sendPushNotification(context, "⚠️ CRITICAL: Engine Overheating", "Water temp reached $payload °F!")
-                                    }
-                                }
-                                "kohler/battery-voltage" -> {
-                                    batteryVoltage = payload
-                                    val v12 = payload.toFloatOrNull() ?: 0f
-                                    if (v12 < 11.8f && v12 > 5.0f) {
-                                        sendPushNotification(context, "⚠️ BATTERY WARNING", "12V Starter Battery low ($payload V)!")
-                                    }
-                                }
-                                "kohler/solar-battery-48v" -> {
-                                    solarBattery48v = payload
-                                    val v48 = payload.toFloatOrNull() ?: 0f
-                                    if (v48 < 48.0f && v48 > 10.0f) {
-                                        sendPushNotification(context, "⚠️ SOLAR BANK WARNING", "48V Battery Bank low ($payload V)!")
-                                    }
-                                }
-                                "kohler/fuel-level" -> {
-                                    fuelLevelPct = payload
-                                    val pct = payload.toFloatOrNull() ?: 0f
-                                    if (pct < 15.0f && pct > 0f) {
-                                        sendPushNotification(context, "⛽ FUEL WARNING", "Fuel Tank low ($payload %)!")
-                                    }
-                                }
-                                "kohler/burn-rate" -> burnRateGph = payload
-                                "kohler/lifetime-fuel" -> lifetimeFuelGal = payload
-                                "kohler/engine-rpm" -> engineRpm = payload
-                                "kohler/generator-status" -> {
-                                    val oldStatus = generatorStatus
-                                    generatorStatus = payload
-                                    if (!oldStatus.contains("CONNECTING") && oldStatus != payload) {
-                                        if (payload.contains("RUNNING", ignoreCase = true)) {
-                                            sendPushNotification(context, "🟢 Generator Started", payload)
-                                        } else if (payload.equals("STOPPED", ignoreCase = true)) {
-                                            sendPushNotification(context, "🔴 Generator Stopped", "Kohler 60kW Genset is now STOPPED")
+
+                                override fun messageArrived(topic: String?, message: MqttMessage?) {
+                                    val payload = message?.toString() ?: return
+                                    val topicName = topic ?: ""
+                                    
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        when (topicName) {
+                                            "kohler/oil-pressure" -> {
+                                                oilPressure = payload
+                                                val psi = payload.toFloatOrNull() ?: 0f
+                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f) {
+                                                    sendPushNotification(context, "⚠️ CRITICAL: Low Oil Pressure", "Oil pressure dropped to $payload PSI!")
+                                                }
+                                            }
+                                            "kohler/water-temp" -> {
+                                                waterTemp = payload
+                                                val temp = payload.toFloatOrNull() ?: 0f
+                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f) {
+                                                    sendPushNotification(context, "⚠️ CRITICAL: Engine Overheating", "Water temp reached $payload °F!")
+                                                }
+                                            }
+                                            "kohler/battery-voltage" -> {
+                                                batteryVoltage = payload
+                                                val v12 = payload.toFloatOrNull() ?: 0f
+                                                if (v12 < 11.8f && v12 > 5.0f) {
+                                                    sendPushNotification(context, "⚠️ BATTERY WARNING", "12V Starter Battery low ($payload V)!")
+                                                }
+                                            }
+                                            "kohler/solar-battery-48v" -> {
+                                                solarBattery48v = payload
+                                                val v48 = payload.toFloatOrNull() ?: 0f
+                                                if (v48 < 48.0f && v48 > 10.0f) {
+                                                    sendPushNotification(context, "⚠️ SOLAR BANK WARNING", "48V Battery Bank low ($payload V)!")
+                                                }
+                                            }
+                                            "kohler/fuel-level" -> {
+                                                fuelLevelPct = payload
+                                                val pct = payload.toFloatOrNull() ?: 0f
+                                                if (pct < 15.0f && pct > 0f) {
+                                                    sendPushNotification(context, "⛽ FUEL WARNING", "Fuel Tank low ($payload %)!")
+                                                }
+                                            }
+                                            "kohler/burn-rate" -> burnRateGph = payload
+                                            "kohler/lifetime-fuel" -> lifetimeFuelGal = payload
+                                            "kohler/engine-rpm" -> engineRpm = payload
+                                            "kohler/generator-status" -> {
+                                                val oldStatus = generatorStatus
+                                                generatorStatus = payload
+                                                if ((oldStatus.equals("STOPPED", ignoreCase = true) || oldStatus.contains("CRANKING")) && payload.contains("RUNNING", ignoreCase = true)) {
+                                                    sendPushNotification(context, "🟢 Generator Started", "Kohler 60kW Genset is now RUNNING")
+                                                } else if ((oldStatus.contains("RUNNING", ignoreCase = true) || oldStatus.contains("COOLDOWN")) && payload.equals("STOPPED", ignoreCase = true)) {
+                                                    sendPushNotification(context, "🔴 Generator Stopped", "Kohler 60kW Genset is now STOPPED")
+                                                }
+                                            }
+                                            "kohler/coolant-heater" -> coolantHeaterOn = payload.contains("ON", ignoreCase = true)
                                         }
                                     }
                                 }
-                                "kohler/coolant-heater" -> coolantHeaterOn = payload.contains("ON", ignoreCase = true)
-                            }
+
+                                override fun deliveryComplete(token: IMqttDeliveryToken?) {}
+                            })
+
+                            client.connect(opts)
+                            connectedClient = client
+                            break
+                        } catch (e: Exception) {
+                            lastException = e
                         }
                     }
+                    if (connectedClient != null && connectedClient.isConnected) {
+                        break
+                    }
+                }
 
-                    override fun deliveryComplete(token: IMqttDeliveryToken?) {}
-                })
+                if (connectedClient != null && connectedClient.isConnected) {
+                    mqttClient = connectedClient
+                    val topics = arrayOf(
+                        "kohler/oil-pressure",
+                        "kohler/water-temp",
+                        "kohler/battery-voltage",
+                        "kohler/solar-battery-48v",
+                        "kohler/fuel-level",
+                        "kohler/burn-rate",
+                        "kohler/lifetime-fuel",
+                        "kohler/engine-rpm",
+                        "kohler/generator-status",
+                        "kohler/coolant-heater"
+                    )
+                    connectedClient.subscribe(topics)
 
-                client.connect(options)
-                mqttClient = client
-
-                // Subscribe to all kohler topics
-                val topics = arrayOf(
-                    "kohler/oil-pressure",
-                    "kohler/water-temp",
-                    "kohler/battery-voltage",
-                    "kohler/solar-battery-48v",
-                    "kohler/fuel-level",
-                    "kohler/burn-rate",
-                    "kohler/lifetime-fuel",
-                    "kohler/engine-rpm",
-                    "kohler/generator-status",
-                    "kohler/coolant-heater"
-                )
-                client.subscribe(topics)
-
-                coroutineScope.launch(Dispatchers.Main) {
-                    generatorStatus = "CONNECTED"
+                    coroutineScope.launch(Dispatchers.Main) {
+                        generatorStatus = "CONNECTED"
+                    }
+                } else {
+                    throw lastException ?: Exception("Connection Failed")
                 }
 
             } catch (e: Exception) {
                 e.printStackTrace()
+                val errReason = if (e is MqttException) {
+                    val causeMsg = e.cause?.localizedMessage ?: e.message
+                    "MQTT (rc=${e.reasonCode}): $causeMsg"
+                } else {
+                    e.localizedMessage ?: e.message ?: "Connection Failed"
+                }
                 coroutineScope.launch(Dispatchers.Main) {
-                    generatorStatus = "CONN ERROR"
+                    generatorStatus = "ERR: $errReason"
                 }
             }
         }
@@ -302,14 +386,9 @@ fun GeneratorAppScreen() {
                     client.publish(topic, message)
                     
                     coroutineScope.launch(Dispatchers.Main) {
-                        generatorStatus = if (cmd == "START") "SENDING START..." else "SENDING STOP..."
-                    }
-
-                    delay(8000)
-                    coroutineScope.launch(Dispatchers.Main) {
-                        if (generatorStatus.startsWith("SENDING")) {
-                            generatorStatus = "CONNECTED"
-                        }
+                        lastCommand = cmd
+                        lastCommandTime = System.currentTimeMillis()
+                        generatorStatus = if (cmd == "START") "CRANKING..." else "COOLDOWN..."
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -358,10 +437,12 @@ fun GeneratorAppScreen() {
                     // Dynamic Status Badge
                     val badgeColor = when {
                         generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF1B3B22)
+                        generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFF3E2723)
                         else -> Color(0xFF2A2A2A)
                     }
                     val textColor = when {
                         generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF4CAF50)
+                        generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFFFF9800)
                         else -> Color.LightGray
                     }
                     
@@ -849,6 +930,164 @@ fun DashboardGauge(title: String, value: String, unit: String, modifier: Modifie
                 color = Color.Gray,
                 fontSize = MaterialTheme.typography.bodySmall.fontSize
             )
+        }
+    }
+}
+
+// =====================================================================
+// 24/7 ULTRA-LOW BATTERY BACKGROUND MONITOR SERVICE
+// =====================================================================
+class GensetMqttService : Service() {
+
+    private var mqttClient: MqttClient? = null
+    private var isConnected = false
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        startForegroundServiceNotification()
+        connectBackgroundMqtt()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!isConnected) {
+            connectBackgroundMqtt()
+        }
+        return START_STICKY
+    }
+
+    private fun startForegroundServiceNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "genset_service_channel",
+                "Genset Background Monitor",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, "genset_service_channel")
+            .setContentTitle("Kohler Genset Monitor")
+            .setContentText("24/7 Low-Battery Generator Guard Active")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+
+        startForeground(1001, notification)
+    }
+
+    private fun connectBackgroundMqtt() {
+        val prefs = getSharedPreferences("kohler_settings", Context.MODE_PRIVATE)
+        val host = prefs.getString("mqtt_host", "100.108.173.127") ?: "100.108.173.127"
+        val user = prefs.getString("mqtt_user", "aahotch2001") ?: "aahotch2001"
+        val pass = prefs.getString("mqtt_pass", "aaronjulie") ?: "aaronjulie"
+
+        val cleanHost = host.trim().removePrefix("tcp://").removePrefix("http://").substringBefore(":")
+        val hostsToTry = mutableListOf<String>()
+        if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
+        if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
+        if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
+
+        Thread {
+            for (targetHost in hostsToTry) {
+                try {
+                    val serverUri = "tcp://$targetHost:1883"
+                    val clientId = "Background_Service_" + System.currentTimeMillis()
+                    val client = MqttClient(serverUri, clientId, MemoryPersistence())
+
+                    val opts = MqttConnectOptions().apply {
+                        if (user.isNotEmpty()) {
+                            userName = user
+                            password = pass.toCharArray()
+                        }
+                        isCleanSession = true
+                        connectionTimeout = 5
+                        keepAliveInterval = 60 // 60s Keep-Alive: Ultra-low battery consumption!
+                    }
+
+                    client.setCallback(object : MqttCallback {
+                        private var lastGenStatus = "STOPPED"
+
+                        override fun connectionLost(cause: Throwable?) {
+                            isConnected = false
+                        }
+
+                        override fun messageArrived(topic: String?, message: MqttMessage?) {
+                            val payload = message?.toString() ?: return
+                            val topicName = topic ?: ""
+
+                            when (topicName) {
+                                "kohler/oil-pressure" -> {
+                                    val psi = payload.toFloatOrNull() ?: 0f
+                                    if (lastGenStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f) {
+                                        sendPushNotification(applicationContext, "⚠️ CRITICAL: Low Oil Pressure", "Oil pressure dropped to $payload PSI!")
+                                    }
+                                }
+                                "kohler/water-temp" -> {
+                                    val temp = payload.toFloatOrNull() ?: 0f
+                                    if (lastGenStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f) {
+                                        sendPushNotification(applicationContext, "⚠️ CRITICAL: Engine Overheating", "Water temp reached $payload °F!")
+                                    }
+                                }
+                                "kohler/battery-voltage" -> {
+                                    val v12 = payload.toFloatOrNull() ?: 0f
+                                    if (v12 < 11.8f && v12 > 5.0f) {
+                                        sendPushNotification(applicationContext, "⚠️ BATTERY WARNING", "12V Starter Battery low ($payload V)!")
+                                    }
+                                }
+                                "kohler/generator-status" -> {
+                                    val old = lastGenStatus
+                                    lastGenStatus = payload
+                                    if (old == "STOPPED" && payload.contains("RUNNING", ignoreCase = true)) {
+                                        sendPushNotification(applicationContext, "🟢 Generator Started", "Kohler 60kW Genset is now RUNNING")
+                                    } else if (old.contains("RUNNING", ignoreCase = true) && payload == "STOPPED") {
+                                        sendPushNotification(applicationContext, "🔴 Generator Stopped", "Kohler 60kW Genset is now STOPPED")
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun deliveryComplete(token: IMqttDeliveryToken?) {}
+                    })
+
+                    client.connect(opts)
+                    mqttClient = client
+                    isConnected = true
+
+                    val topics = arrayOf(
+                        "kohler/generator-status"
+                    )
+                    client.subscribe(topics)
+                    break
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }.start()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try { mqttClient?.disconnect() } catch (ignored: Exception) {}
+        try { mqttClient?.close() } catch (ignored: Exception) {}
+    }
+}
+
+// =====================================================================
+// AUTO-START SERVICE ON PHONE BOOT
+// =====================================================================
+class BootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            val serviceIntent = Intent(context, GensetMqttService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
         }
     }
 }

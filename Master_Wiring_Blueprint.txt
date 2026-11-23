@@ -29,27 +29,29 @@ B. Soldered Power Bus Rail Connections:
    - Soldered GND Bus Rail (Black): Connects ALL Grounds together (WT32-ETH01, Sensors, Inverter, Kohler Panel).
 
 --------------------------------------------------------------------------------
-3. WT32-ETH01 BOARD POWER & DATA CONNECTIONS
+3. WT32-ETH01 v1.4 BOARD PHYSICAL PINOUT CONNECTIONS
 --------------------------------------------------------------------------------
 Power Connections:
-   - Terminal [5V]  <-- [RED] Wire from [Soldered 5V Power Bus Rail]
-   - Terminal [GND] <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+   - Terminal [5V]     (Right Row, 2nd from bottom) <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Terminal [GND]    (Right Row / Left Row)       <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
 
 Ethernet Port:
-   - Onboard RJ45 Jack --> Plug standard Cat5e/Cat6 cable directly into router/switch (Mosquitto Broker: 192.168.65.91)
+   - Onboard RJ45 Jack --> Plug standard Cat5e/Cat6 cable directly into router/switch (Mosquitto Broker: 192.168.68.91 / Tailscale: 100.108.173.127)
 
 I2C Bus (ADS1115 ADC):
-   - Terminal [GPIO 32] --> [GREEN] Wire to ADS1115 [SDA]
-   - Terminal [GPIO 33] --> [WHITE] Wire to ADS1115 [SCL]
+   - Terminal [IO14]   (GPIO 14 - Left Row 8th down) --> [GREEN] Wire to ADS1115 [SDA]
+   - Terminal [IO15]   (GPIO 15 - Left Row 7th down) --> [WHITE] Wire to ADS1115 [SCL]
 
-Optocoupler Inputs (PC817 Board Outputs - Open Collector Ground Switching):
-   - Terminal [GPIO 35] <-- [BLUE] Wire from PC817 Pin [O1] (Alternator 'W' Terminal Engine Running Sense)
-   - Terminal [GPIO 36] <-- [BLUE] Wire from PC817 Pin [O2] (EG4 18kPV Auto-Start Signal)
-   - Terminal [GPIO 39] <-- [BLUE] Wire from PC817 Pin [O3] (AC Frequency / Engine RPM)
+Optocoupler Inputs (PC817 Board Outputs):
+   - Terminal [RXD]    (GPIO 5  - Right Row 7th down)  <-- [BLUE] Wire from PC817 Pin [O1] (Alternator Terminal 'W' AC Pulse Engine RPM & Running Sense)
+   - Terminal [IO36]   (GPIO 36 - Left Row 6th down)   <-- [BLUE] Wire from PC817 Pin [O2] (EG4 18kPV Auto-Start Signal)
 
 Relay Control Outputs (Songle Relay & SSR-40DA):
-   - Terminal [GPIO 4]  --> [BLUE] Wire to Songle Relay 1 [IN1] (Remote Start Command)
-   - Terminal [GPIO 12] --> [BLUE] Wire to SSR-40DA [Pin 3 DC+] (120V Coolant Heater Control)
+   - Terminal [IO4]    (GPIO 4  - Left Row 11th down) --> [BLUE] Wire to Songle Relay 1 [IN1] (Remote Start Command -> Kohler Terminals 3 & 4)
+   - Terminal [IO2]    (GPIO 2  - Left Row 12th down) --> [BLUE] Wire to SSR-40DA [Pin 3 DC+] (120V Coolant Heater Control)
+
+Flashing / Boot Mode Jumper:
+   - Terminal [IO0]    (GPIO 0  - Left Row 3rd down)  --> Jumper wire to [GND] when uploading firmware in Arduino IDE
 
 --------------------------------------------------------------------------------
 4. ADS1115 16-BIT PRECISION ADC MODULE
@@ -57,8 +59,8 @@ Relay Control Outputs (Songle Relay & SSR-40DA):
 Power Connections:
    - Pin [VDD]      <-- [RED] Wire from [Soldered 5V Power Bus Rail]
    - Pin [GND]      <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
-   - Pin [SDA]      <-- [GREEN] Wire from WT32-ETH01 [GPIO 32]
-   - Pin [SCL]      <-- [WHITE] Wire from WT32-ETH01 [GPIO 33]
+   - Pin [SDA]      <-- [GREEN] Wire from WT32-ETH01 Pin [IO14]
+   - Pin [SCL]      <-- [WHITE] Wire from WT32-ETH01 Pin [IO15]
 
 Analog Sensor Channel Inputs:
    - Pin [A0] (Oil Pressure):
@@ -92,4 +94,20 @@ Each analog gauge on the Kohler Decision Maker 3 panel has 3 rear terminals:
 Tapping Instructions:
    - Oil Pressure Gauge: Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to ADS1115 [A0]
    - Water Temp Gauge:   Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to ADS1115 [A1]
-   - Hertz / Frequency:  Tap 1 [YELLOW] wire onto Terminal [S] --> Runs to PC817 [Ch 3 IN]
+   - Alternator Terminal W (RPM & Frequency): Tap 1 [BLUE] wire onto Alternator Terminal [W] --> Runs to PC817 [Ch 3 IN+] via [1k Ohm Resistor]
+
+--------------------------------------------------------------------------------
+6. PC817 OPTOCOUPLER MODULE & ALTERNATOR TERMINAL 'W' RESISTOR WIRING
+--------------------------------------------------------------------------------
+Alternator Terminal 'W' (AC Voltage Pulse) Input Protection:
+   - Alternator Terminal [W] outputs 12V-20V AC pulses when engine is running.
+   - Install a [1k Ohm 1/4W Resistor] in series on the signal wire from Terminal [W] to PC817 [Ch 1 IN+].
+   - Install a [1N4007 or 1N4148 Diode] across PC817 [Ch 1 IN+] and [Ch 1 IN-]
+     (Cathode line mark to IN+, Anode to IN-) to protect optocoupler LED against reverse AC half-cycles.
+   - PC817 [Ch 1 IN-] connects to [Soldered Common Ground Bus Rail].
+
+PC817 Board Output Connections to WT32-ETH01:
+   - PC817 [VCC] --> [RED] Wire to WT32-ETH01 [3V3] Pin
+   - PC817 [GND] --> [BLACK] Wire to [Soldered Common Ground Bus Rail]
+   - PC817 [O1]  --> [BLUE] Wire to WT32-ETH01 Pin [IO35] (Left Row 10th down - Alternator Terminal 'W' RPM)
+   - PC817 [O2]  --> [BLUE] Wire to WT32-ETH01 Pin [IO36] (Left Row 6th down - EG4 Inverter Auto-Start)

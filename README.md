@@ -17,20 +17,22 @@
 - **Secondary Connection:** Built-in ESP32 Wi-Fi (Automatic Failover)
 
 ### Mosquitto Broker Configuration:
-- **Broker IP:** `192.168.65.91` (Local Network Mosquitto Broker)
-- **Tailscale 5G Worldwide IP:** `100.98.23.73` (For Android Phone App anywhere on Earth via 5G)
+- **Broker IP:** `192.168.68.91` (Local Network Mosquitto Broker)
+- **Tailscale 5G Worldwide IP:** `100.108.173.127` (For Android Phone App anywhere on Earth via 5G)
 - **Port:** `1883`
 - **Username:** `aahotch2001`
 - **Password:** `aaronjulie`
 
-### WT32-ETH01 Dedicated Pinout:
-- **I2C SDA (ADS1115 ADC):** GPIO 32
-- **I2C SCL (ADS1115 ADC):** GPIO 33
-- **Relay 1 (Kohler Engine Crank/Start):** GPIO 4
-- **SSR-40DA Relay (120V Coolant Block Heater):** GPIO 12
-- **Optocoupler 1 (Engine Running Sense - Terminal 70R):** GPIO 35 (Input Only)
-- **Optocoupler 2 (EG4 18kPV Inverter Auto-Start):** GPIO 36 (Input Only)
-- **Optocoupler 3 (AC Frequency / Engine RPM Pulse):** GPIO 39 (Input Only)
+### WT32-ETH01 v1.4 Physical Board Pinout Map:
+- **`IO14` Pin (GPIO 14):** I2C SDA (ADS1115 ADC SDA)
+- **`IO15` Pin (GPIO 15):** I2C SCL (ADS1115 ADC SCL)
+- **`IO4` Pin (GPIO 4):** Songle Start Relay IN1 (Kohler Terminals 3 & 4)
+- **`IO2` Pin (GPIO 2):** SSR-40DA Solid State Relay (120V Coolant Block Heater)
+- **`RXD` Pin (GPIO 5):** Optocoupler Ch1 Input (Alternator Terminal 'W' Engine RPM & Running Sense)
+- **`IO36` Pin (GPIO 36):** Optocoupler Ch2 Input (EG4 18kPV Inverter Auto-Start)
+- **`IO0` Pin (GPIO 0):** Bootloader Flashing Mode Jumper (Bridge to GND when flashing)
+- **`5V` Pin:** 5.0V Regulated Main Power Input (from DROK Buck Converter)
+- **`GND` Pins:** Common Ground (tied to All Grounds)
 
 ### MQTT Topics:
 - `kohler/generator-command` (START / STOP)
