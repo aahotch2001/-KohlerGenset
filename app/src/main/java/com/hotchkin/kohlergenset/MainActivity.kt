@@ -179,6 +179,11 @@ fun GeneratorAppScreen() {
     var victronChargerOn by remember { mutableStateOf(false) }
     var lastCommand by remember { mutableStateOf("") }
     var lastCommandTime by remember { mutableStateOf(0L) }
+    var lastOilAlertTime by remember { mutableStateOf(0L) }
+    var lastTempAlertTime by remember { mutableStateOf(0L) }
+    var lastBattAlertTime by remember { mutableStateOf(0L) }
+    var lastSolarAlertTime by remember { mutableStateOf(0L) }
+    var lastFuelAlertTime by remember { mutableStateOf(0L) }
 
     // Safety Confirmation Modal States
     var pendingCommand by remember { mutableStateOf<String?>(null) } // "START" or "STOP"
@@ -254,35 +259,45 @@ fun GeneratorAppScreen() {
                                             "kohler/oil-pressure" -> {
                                                 oilPressure = payload
                                                 val psi = payload.toFloatOrNull() ?: 0f
-                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f) {
+                                                val now = System.currentTimeMillis()
+                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && psi < 15.0f && psi > 0f && (now - lastOilAlertTime >= 15 * 60 * 1000L)) {
+                                                    lastOilAlertTime = now
                                                     sendPushNotification(context, "⚠️ CRITICAL: Low Oil Pressure", "Oil pressure dropped to $payload PSI!")
                                                 }
                                             }
                                             "kohler/water-temp" -> {
                                                 waterTemp = payload
                                                 val temp = payload.toFloatOrNull() ?: 0f
-                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f) {
+                                                val now = System.currentTimeMillis()
+                                                if (generatorStatus.contains("RUNNING", ignoreCase = true) && temp > 225.0f && (now - lastTempAlertTime >= 15 * 60 * 1000L)) {
+                                                    lastTempAlertTime = now
                                                     sendPushNotification(context, "⚠️ CRITICAL: Engine Overheating", "Water temp reached $payload °F!")
                                                 }
                                             }
                                             "kohler/battery-voltage" -> {
                                                 batteryVoltage = payload
                                                 val v12 = payload.toFloatOrNull() ?: 0f
-                                                if (v12 < 11.8f && v12 > 5.0f) {
+                                                val now = System.currentTimeMillis()
+                                                if (v12 < 11.8f && v12 > 5.0f && (now - lastBattAlertTime >= 15 * 60 * 1000L)) {
+                                                    lastBattAlertTime = now
                                                     sendPushNotification(context, "⚠️ BATTERY WARNING", "12V Starter Battery low ($payload V)!")
                                                 }
                                             }
                                             "kohler/solar-battery-48v" -> {
                                                 solarBattery48v = payload
                                                 val v48 = payload.toFloatOrNull() ?: 0f
-                                                if (v48 < 48.0f && v48 > 10.0f) {
+                                                val now = System.currentTimeMillis()
+                                                if (v48 < 48.0f && v48 > 10.0f && (now - lastSolarAlertTime >= 15 * 60 * 1000L)) {
+                                                    lastSolarAlertTime = now
                                                     sendPushNotification(context, "⚠️ SOLAR BANK WARNING", "48V Battery Bank low ($payload V)!")
                                                 }
                                             }
                                             "kohler/fuel-level" -> {
                                                 fuelLevelPct = payload
                                                 val pct = payload.toFloatOrNull() ?: 0f
-                                                if (pct < 15.0f && pct > 0f) {
+                                                val now = System.currentTimeMillis()
+                                                if (pct < 15.0f && pct > 0f && (now - lastFuelAlertTime >= 15 * 60 * 1000L)) {
+                                                    lastFuelAlertTime = now
                                                     sendPushNotification(context, "⛽ FUEL WARNING", "Fuel Tank low ($payload %)!")
                                                 }
                                             }
