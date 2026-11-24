@@ -185,6 +185,15 @@ fun GeneratorAppScreen() {
     var lastSolarAlertTime by remember { mutableStateOf(0L) }
     var lastFuelAlertTime by remember { mutableStateOf(0L) }
 
+    // Live Event Logs List
+    val systemLogs = remember { mutableStateListOf<String>() }
+
+    fun addLog(msg: String) {
+        val timeStr = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.US).format(java.util.Date())
+        systemLogs.add(0, "[$timeStr] $msg")
+        if (systemLogs.size > 100) systemLogs.removeAt(systemLogs.size - 1)
+    }
+
     // Safety Confirmation Modal States
     var pendingCommand by remember { mutableStateOf<String?>(null) } // "START" or "STOP"
 
@@ -307,9 +316,14 @@ fun GeneratorAppScreen() {
                                             "kohler/generator-status" -> {
                                                 val oldStatus = generatorStatus
                                                 generatorStatus = payload
+                                                if (oldStatus != payload) {
+                                                    addLog("Status update: $oldStatus ➔ $payload")
+                                                }
                                                 if ((oldStatus.equals("STOPPED", ignoreCase = true) || oldStatus.contains("CRANKING")) && payload.contains("RUNNING", ignoreCase = true)) {
+                                                    addLog("🟢 Event: Generator Started ($payload)")
                                                     sendPushNotification(context, "🟢 Generator Started", "Kohler 60kW Genset is now RUNNING")
                                                 } else if ((oldStatus.contains("RUNNING", ignoreCase = true) || oldStatus.contains("COOLDOWN")) && payload.equals("STOPPED", ignoreCase = true)) {
+                                                    addLog("🔴 Event: Generator Stopped")
                                                     sendPushNotification(context, "🔴 Generator Stopped", "Kohler 60kW Genset is now STOPPED")
                                                 }
                                             }
@@ -353,6 +367,7 @@ fun GeneratorAppScreen() {
 
                     coroutineScope.launch(Dispatchers.Main) {
                         generatorStatus = "CONNECTED"
+                        addLog("Connected to Mosquitto Broker")
                     }
                 } else {
                     throw lastException ?: Exception("Connection Failed")
@@ -368,6 +383,7 @@ fun GeneratorAppScreen() {
                 }
                 coroutineScope.launch(Dispatchers.Main) {
                     generatorStatus = "ERR: $errReason"
+                    addLog("Connection failed: $errReason")
                 }
             }
         }
@@ -910,6 +926,49 @@ fun GeneratorAppScreen() {
                             label = { Text("Max Run Time (Minutes)") },
                             singleLine = true
                         )
+
+                        HorizontalDivider(color = Color(0xFF333333))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📜 System Event Logs:", color = Color.White, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = { systemLogs.clear() }) {
+                                Text("Clear", color = Color(0xFFFF5252), fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                            }
+                        }
+
+                        Surface(
+                            color = Color(0xFF121212),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                if (systemLogs.isEmpty()) {
+                                    Text("No event logs recorded yet.", color = Color.Gray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                                } else {
+                                    systemLogs.forEach { logLine ->
+                                        Text(
+                                            text = logLine,
+                                            color = when {
+                                                logLine.contains("⚠️") || logLine.contains("ERR") || logLine.contains("FAULT") -> Color(0xFFFF5252)
+                                                logLine.contains("🟢") || logLine.contains("Connected") -> Color(0xFF66BB6A)
+                                                else -> Color.LightGray
+                                            },
+                                            fontSize = MaterialTheme.typography.bodySmall.fontSize
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 confirmButton = {
