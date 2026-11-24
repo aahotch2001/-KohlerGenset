@@ -34,15 +34,17 @@ B. Soldered Power Bus Rail Connections:
 Power & Ground Connections:
    - Terminal [VIN]    (Left Row 1st)  <-- [RED] Wire from [Soldered 5V Power Bus Rail]
    - Terminal [GND]    (Left / Right)  <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
-   - Terminal [3V3]    (Right Row 1st) --> [RED] Wire to PC817 VCC & DS18B20 Temp VCC
+   - Terminal [3V3]    (Right Row 1st) --> [RED] Wire to DS18B20 Temp Sensor VCC (Red Wire)
 
 I2C Bus (ADS1115 ADC Module):
    - Terminal [D21]    (Right Row 11th down) --> [GREEN] Wire to ADS1115 ADC Pin [SDA]
    - Terminal [D22]    (Right Row 14th down) --> [WHITE] Wire to ADS1115 ADC Pin [SCL]
 
-Optocoupler Inputs (PC817 Board Outputs):
-   - Terminal [D18]    (Right Row 9th down)  <-- [BLUE] Wire from PC817 Pin [O1] (Alternator Terminal 'W' RPM)
-   - Terminal [D19]    (Right Row 10th down) <-- [BLUE] Wire from PC817 Pin [O2] (EG4 18kPV Auto-Start Signal)
+Optocoupler Inputs (PC817 Board Outputs - Pure Ground Switching, NO VCC Wire!):
+   - PC817 Output [O1] (Ch1): [BLUE] Wire to ELEGOO Terminal [D18] (Alternator Terminal 'W' RPM)
+   - PC817 Output [O2] (Ch2): [BLUE] Wire to ELEGOO Terminal [D19] (EG4 18kPV Auto-Start Signal)
+   - PC817 Ground [GND]:      [BLACK] Wire to [Soldered Common Ground Bus Rail]
+   - (NO VCC POWER WIRE AT ALL ON THE PC817 OUTPUT SIDE!)
 
 Relay & Charger Control Outputs:
    - Terminal [D26]    (Left Row 7th down)   --> [BLUE] Wire to Songle Relay 1 [IN1] (Start Command -> Terminals 3 & 4)

@@ -23,15 +23,16 @@
 - **Username:** `aahotch2001`
 - **Password:** `aaronjulie`
 
-### WT32-ETH01 v1.4 Physical Board Pinout Map:
-- **`IO14` Pin (GPIO 14):** I2C SDA (ADS1115 ADC SDA)
-- **`IO15` Pin (GPIO 15):** I2C SCL (ADS1115 ADC SCL)
-- **`IO4` Pin (GPIO 4):** Songle Start Relay IN1 (Kohler Terminals 3 & 4)
-- **`IO2` Pin (GPIO 2):** SSR-40DA Solid State Relay (120V Coolant Block Heater)
-- **`RXD` Pin (GPIO 5):** Optocoupler Ch1 Input (Alternator Terminal 'W' Engine RPM & Running Sense)
-- **`IO36` Pin (GPIO 36):** Optocoupler Ch2 Input (EG4 18kPV Inverter Auto-Start)
-- **`IO0` Pin (GPIO 0):** Bootloader Flashing Mode Jumper (Bridge to GND when flashing)
-- **`5V` Pin:** 5.0V Regulated Main Power Input (from DROK Buck Converter)
+### ELEGOO ESP32 USB-C Breakout Adapter Pinout Map:
+- **`D21` Pin (GPIO 21):** Native I2C SDA (ADS1115 ADC SDA)
+- **`D22` Pin (GPIO 22):** Native I2C SCL (ADS1115 ADC SCL)
+- **`D26` Pin (GPIO 26):** Songle Start Relay IN1 (Kohler Terminals 3 & 4)
+- **`D27` Pin (GPIO 27):** Songle Heater Relay IN2 (120V Coolant Block Heater Control)
+- **`D4` Pin (GPIO 4):** Victron Orion 48V-to-12V Charger Remote Pin 'H' (Direct 3.3V Control)
+- **`D18` Pin (GPIO 18):** Optocoupler Ch1 Output O1 (Alternator Terminal 'W' Engine RPM & Running Sense - No VCC Needed!)
+- **`D19` Pin (GPIO 19):** Optocoupler Ch2 Output O2 (EG4 18kPV Inverter Auto-Start)
+- **`D25` Pin (GPIO 25):** DS18B20 3-Wire Digital Temp Sensor (Data Wire + 4.7k Ω resistor to 3.3V)
+- **`VIN` Pin:** 5.0V Regulated Main Power Input (from DROK Buck Converter)
 - **`GND` Pins:** Common Ground (tied to All Grounds)
 
 ### MQTT Topics:
