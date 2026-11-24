@@ -523,31 +523,64 @@ fun GeneratorAppScreen() {
                     }
                 },
                 actions = {
-                    // Dynamic Status Badge
-                    val badgeColor = when {
-                        generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF1B3B22)
-                        generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFF3E2723)
-                        else -> Color(0xFF2A2A2A)
-                    }
-                    val textColor = when {
-                        generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF4CAF50)
-                        generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFFFF9800)
-                        else -> Color.LightGray
-                    }
-                    
-                    Surface(
-                        color = badgeColor,
-                        shape = RoundedCornerShape(16.dp),
-                        onClick = { connectMqtt() },
-                        modifier = Modifier.padding(end = 16.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        Text(
-                            text = generatorStatus,
-                            color = textColor,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        // 1. Victron 12V Charger Indicator (Green = ON, Red = OFF)
+                        Surface(
+                            color = if (victronChargerOn) Color(0xFF1B3B22) else Color(0xFF5C2323),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (victronChargerOn) "CHARGER ON" else "CHARGER OFF",
+                                color = if (victronChargerOn) Color(0xFF4CAF50) else Color(0xFFFF5252),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // 2. Coolant Pump Indicator (Orange = ON, Blue = OFF)
+                        Surface(
+                            color = if (coolantHeaterOn) Color(0xFF3E2723) else Color(0xFF0D324D),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (coolantHeaterOn) "PUMP ON" else "PUMP OFF",
+                                color = if (coolantHeaterOn) Color(0xFFFF9800) else Color(0xFF2196F3),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // 3. Generator Status Badge (Clickable to Reconnect)
+                        val badgeColor = when {
+                            generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF1B3B22)
+                            generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFF3E2723)
+                            else -> Color(0xFF2A2A2A)
+                        }
+                        val textColor = when {
+                            generatorStatus.contains("RUNNING", ignoreCase = true) -> Color(0xFF4CAF50)
+                            generatorStatus.contains("COOLDOWN", ignoreCase = true) || generatorStatus.contains("CRANKING", ignoreCase = true) -> Color(0xFFFF9800)
+                            else -> Color.LightGray
+                        }
+
+                        Surface(
+                            color = badgeColor,
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = { connectMqtt() }
+                        ) {
+                            Text(
+                                text = generatorStatus,
+                                color = textColor,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
