@@ -327,7 +327,7 @@ void loop() {
       batteryVoltage = volts2 * 6.047;       // Calibrated for 10k/2.2k divider (13.60V actual)
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
-      solar48v = volts3 * (46.7 / 2.7);       // 44k (two 22k in series) + 2.7k divider ratio
+      solar48v = volts3 * (49.7 / 2.7);       // Calibrated for single 47k + 2.7k divider ratio (18.407 multiplier)
       if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
 
