@@ -21,7 +21,7 @@ const int   MQTT_PORT     = 1883;
 const char* MQTT_USER     = "aahotch2001";
 const char* MQTT_PASS     = "aaronjulie";
 
-const float TANK_CAPACITY_GALLONS = 100.0;
+const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 
 // Relay Trigger Logic (Active-LOW Relay Module: LOW ground turns Relay ON, HIGH turns Relay OFF)
 #define RELAY_ON  LOW
@@ -33,8 +33,8 @@ const float TANK_CAPACITY_GALLONS = 100.0;
 // =================================================================
 // 2. ELEGOO ESP-32 HARDWARE PIN DEFINITIONS (USER BREAKOUT BOARD)
 // =================================================================
-#define SDA_PIN 21 // Native Hardware I2C SDA -> ADS1115 #1 & #2 SDA (Pin D21)
-#define SCL_PIN 22 // Native Hardware I2C SCL -> ADS1115 #1 & #2 SCL (Pin D22)
+#define SDA_PIN 21 // Native Hardware I2C SDA -> ADS1115 SDA (Pin D21)
+#define SCL_PIN 22 // Native Hardware I2C SCL -> ADS1115 SCL (Pin D22)
 
 #define RELAY_START_PIN     26 // GPIO 26 -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin D26)
 #define RELAY_HEATER_PIN    27 // GPIO 27 -> Songle Relay IN2 (120V Coolant Heater - Pin D27)
@@ -212,6 +212,10 @@ float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
 float currentWaterTemp = 70.0;
 float currentBlockTemp = 0.0;
+
+// Hydrostatic Real-Time Transducer Burn Rate Memory
+float prevFuelGallons = -1.0;
+unsigned long prevFuelTimeMs = 0;
 
 // =================================================================
 // 5. MQTT CALLBACK (Receives Commands & Config from Phone App)
@@ -487,7 +491,7 @@ void loop() {
       if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
 
-    // --- C. READ ADS1115 ADC #2 (0x49) 16-BIT 5 PSI HYDROSTATIC FUEL TRANSDUCER ---
+    // --- C. READ ADS1115 ADC #2 (0x49) 16-BIT 5 PSI HYDROSTATIC FUEL TRANSDUCER & BURN RATE ---
     float fuelLevelPct = 100.0;
     if (ads2Present) {
       int16_t fuelAdc = ads2.readADC_SingleEnded(0); // 2nd ADS1115 Pin A0 (0.5V - 4.5V Direct Input!)
@@ -501,6 +505,38 @@ void loop() {
       } else {
         fuelLevelPct = 0.0; // Sensor disconnected / empty
       }
+    }
+
+    // REAL-TIME HYDROSTATIC TRANSDUCER BURN RATE (GPH) CALCULATION
+    float currentFuelGallons = (fuelLevelPct / 100.0) * TANK_CAPACITY_GALLONS;
+    if (isGeneratorRunning) {
+      if (prevFuelGallons < 0.0) {
+        prevFuelGallons = currentFuelGallons;
+        prevFuelTimeMs = now;
+        currentBurnRateGph = 2.4; // Initial John Deere 1800 RPM nominal rate
+      } else {
+        unsigned long elapsedMs = now - prevFuelTimeMs;
+        if (elapsedMs >= 60000) { // Measure rolling 1-minute transducer fuel consumption
+          float gallonsBurned = prevFuelGallons - currentFuelGallons;
+          float hoursElapsed = elapsedMs / 3600000.0;
+
+          if (gallonsBurned >= 0.0 && gallonsBurned < 10.0) {
+            currentBurnRateGph = gallonsBurned / hoursElapsed; // Measured GPH from Transducer!
+            sessionGallonsBurned += gallonsBurned;
+            lifetimeGallonsBurned += gallonsBurned;
+            prefs.putFloat("lifetimeFuel", lifetimeGallonsBurned);
+          } else {
+            // If fuel was extracted for tractors or added, fallback to John Deere nominal rate
+            currentBurnRateGph = 2.4;
+          }
+
+          prevFuelGallons = currentFuelGallons;
+          prevFuelTimeMs = now;
+        }
+      }
+    } else {
+      currentBurnRateGph = 0.0; // 0.0 GPH when generator is stopped
+      prevFuelGallons = -1.0;
     }
 
     // --- D. COOLANT HEATER THERMOSTAT CONTROL (Uses 3-Wire Digital Temp Sensor!) ---
