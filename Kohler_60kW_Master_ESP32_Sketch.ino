@@ -165,6 +165,7 @@ const char* topicChargerAutoEnable = "kohler/charger-auto-enable";
 const char* topicChargerSetOnVolts = "kohler/charger-set-on-volts";
 const char* topicChargerSetOffVolts = "kohler/charger-set-off-volts";
 const char* topicChargerSetMaxMins = "kohler/charger-set-max-mins";
+const char* topicBattHealth  = "kohler/battery-health";
 
 bool isGeneratorRunning = false;
 bool manualHeaterOn = false;
@@ -174,6 +175,9 @@ bool autoHeaterEnabled = true;
 bool manualChargerOn = false;
 bool autoChargerOn = false;
 bool autoChargerEnabled = true;
+
+float minCrankVolts = 15.0;
+String battHealthStr = "HEALTHY";
 
 float heaterOnTemp = 38.0;
 float heaterOffTemp = 50.0;
@@ -443,6 +447,20 @@ void loop() {
       batteryVoltage = volts2 * 7.450;       // Calibrated for 13.70V actual multimeter reading
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
+      // Cranking Voltage Sag & Battery Health Tracking
+      if (startRelayEngaged && batteryVoltage > 5.0) {
+        if (batteryVoltage < minCrankVolts) {
+          minCrankVolts = batteryVoltage;
+        }
+      }
+      if (minCrankVolts >= 10.0 || batteryVoltage >= 12.5) {
+        battHealthStr = "HEALTHY";
+      } else if (minCrankVolts >= 9.0) {
+        battHealthStr = "FAIR";
+      } else if (minCrankVolts < 9.0 && minCrankVolts > 5.0) {
+        battHealthStr = "WEAK";
+      }
+
       solar48v = volts3 * (49.7 / 2.7);       // 47k + 2.7k divider ratio (18.407 multiplier)
       if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
@@ -501,6 +519,7 @@ void loop() {
     client.publish(topicTemp, String(currentWaterTemp, 1).c_str());
     client.publish(topicBlockTemp, String(currentBlockTemp, 1).c_str());
     client.publish(topicBatt, String(batteryVoltage, 2).c_str());
+    client.publish(topicBattHealth, battHealthStr.c_str());
     client.publish(topicSolar48v, String(solar48v, 1).c_str());
     client.publish(topicFuel, String(fuelLevelPct, 0).c_str());
     client.publish(topicBurnRate, String(currentBurnRateGph, 1).c_str());

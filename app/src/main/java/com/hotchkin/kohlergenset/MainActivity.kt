@@ -176,6 +176,7 @@ fun GeneratorAppScreen() {
     var waterTemp by remember { mutableStateOf("0") }
     var blockTemp by remember { mutableStateOf("0") }
     var batteryVoltage by remember { mutableStateOf("0.0") }
+    var batteryHealth by remember { mutableStateOf("HEALTHY") }
     var solarBattery48v by remember { mutableStateOf("0.0") }
     var fuelLevelPct by remember { mutableStateOf("0") }
     var burnRateGph by remember { mutableStateOf("0.0") }
@@ -337,6 +338,7 @@ fun GeneratorAppScreen() {
                                             }
                                             "kohler/coolant-heater" -> coolantHeaterOn = payload.contains("ON", ignoreCase = true)
                                             "kohler/victron-charger" -> victronChargerOn = payload.contains("ON", ignoreCase = true)
+                                            "kohler/battery-health" -> batteryHealth = payload
                                         }
                                     }
                                 }
@@ -363,6 +365,7 @@ fun GeneratorAppScreen() {
                         "kohler/water-temp",
                         "kohler/block-temp",
                         "kohler/battery-voltage",
+                        "kohler/battery-health",
                         "kohler/solar-battery-48v",
                         "kohler/fuel-level",
                         "kohler/burn-rate",
