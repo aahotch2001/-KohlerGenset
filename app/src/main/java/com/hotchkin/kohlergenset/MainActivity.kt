@@ -104,6 +104,9 @@ class MainActivity : ComponentActivity() {
 
 fun sendPushNotification(context: Context, title: String, text: String) {
     try {
+        val prefs = context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("notifications_enabled", true)) return // User disabled notifications
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return
@@ -170,6 +173,10 @@ fun GeneratorAppScreen() {
     var chargerOnVolts by remember { mutableStateOf(prefs.getString("charger_on_volts", "12.2") ?: "12.2") }
     var chargerOffVolts by remember { mutableStateOf(prefs.getString("charger_off_volts", "13.8") ?: "13.8") }
     var chargerMaxMins by remember { mutableStateOf(prefs.getString("charger_max_mins", "120") ?: "120") }
+
+    // Notifications Master Switch & Full Logs Modal State
+    var notificationsEnabled by remember { mutableStateOf(prefs.getBoolean("notifications_enabled", true)) }
+    var showFullLogsDialog by remember { mutableStateOf(false) }
 
     // Live Telemetry States
     var oilPressure by remember { mutableStateOf("0") }
@@ -1049,44 +1056,51 @@ fun GeneratorAppScreen() {
                         )
 
                         HorizontalDivider(color = Color(0xFF333333))
+                        // Push Notifications Master Toggle Switch
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("📜 System Event Logs:", color = Color.White, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { systemLogs.clear() }) {
-                                Text("Clear", color = Color(0xFFFF5252), fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text("Push Notifications", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Receive Start/Stop & Fault alerts on phone", color = Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                             }
+                            Switch(
+                                checked = notificationsEnabled,
+                                onCheckedChange = { isChecked ->
+                                    notificationsEnabled = isChecked
+                                    prefs.edit().putBoolean("notifications_enabled", isChecked).apply()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
+                            )
                         }
 
+                        HorizontalDivider(color = Color(0xFF333333))
+                        // Full Screen System Logs Entry Card
                         Surface(
                             color = Color(0xFF121212),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
+                            onClick = { showFullLogsDialog = true },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(
+                            Row(
                                 modifier = Modifier
-                                    .padding(8.dp)
-                                    .verticalScroll(rememberScrollState())
+                                    .padding(12.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (systemLogs.isEmpty()) {
-                                    Text("No event logs recorded yet.", color = Color.Gray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
-                                } else {
-                                    systemLogs.forEach { logLine ->
-                                        Text(
-                                            text = logLine,
-                                            color = when {
-                                                logLine.contains("⚠️") || logLine.contains("ERR") || logLine.contains("FAULT") -> Color(0xFFFF5252)
-                                                logLine.contains("🟢") || logLine.contains("Connected") -> Color(0xFF66BB6A)
-                                                else -> Color.LightGray
-                                            },
-                                            fontSize = MaterialTheme.typography.bodySmall.fontSize
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                    }
+                                Column {
+                                    Text("📜 System Event Logs", color = Color.White, fontWeight = FontWeight.Bold)
+                                    val countText = if (systemLogs.isEmpty()) "0 Events Recorded" else "${systemLogs.size} Events (Tap to View)"
+                                    Text(countText, color = Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                                }
+                                Button(
+                                    onClick = { showFullLogsDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A))
+                                ) {
+                                    Text("VIEW LOGS ➔", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1105,6 +1119,7 @@ fun GeneratorAppScreen() {
                             .putString("charger_off_volts", chargerOffVolts.trim())
                             .putString("charger_max_mins", chargerMaxMins.trim())
                             .putBoolean("auto_charger_enable", autoChargerEnabled)
+                            .putBoolean("notifications_enabled", notificationsEnabled)
                             .apply()
                         showSettingsDialog = false
                         connectMqtt()
@@ -1114,6 +1129,88 @@ fun GeneratorAppScreen() {
                         Text("Save & Apply")
                     }
                 },
+                containerColor = Color(0xFF1E1E1E)
+            )
+        }
+
+        // --- FULL SCREEN SYSTEM EVENT LOGS MODAL ---
+        if (showFullLogsDialog) {
+            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+            AlertDialog(
+                onDismissRequest = { showFullLogsDialog = false },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📜 System Event Logs", color = Color.White, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { showFullLogsDialog = false }) {
+                            Text("CLOSE", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Button(
+                                onClick = {
+                                    val fullLogText = systemLogs.joinToString("\n")
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(fullLogText))
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A))
+                            ) {
+                                Text("COPY LOGS", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { systemLogs.clear() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C2323))
+                            ) {
+                                Text("CLEAR LOGS", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Surface(
+                            color = Color(0xFF0D0D0D),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(380.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                if (systemLogs.isEmpty()) {
+                                    Text("No event logs recorded yet.", color = Color.Gray)
+                                } else {
+                                    systemLogs.forEach { logLine ->
+                                        Text(
+                                            text = logLine,
+                                            color = when {
+                                                logLine.contains("⚠️") || logLine.contains("ERR") || logLine.contains("FAULT") -> Color(0xFFFF5252)
+                                                logLine.contains("🟢") || logLine.contains("Connected") -> Color(0xFF66BB6A)
+                                                else -> Color.LightGray
+                                            },
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
                 containerColor = Color(0xFF1E1E1E)
             )
         }
