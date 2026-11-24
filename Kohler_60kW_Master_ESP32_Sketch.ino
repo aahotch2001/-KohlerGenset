@@ -33,8 +33,8 @@ const float TANK_CAPACITY_GALLONS = 100.0;
 // =================================================================
 // 2. ELEGOO ESP-32 HARDWARE PIN DEFINITIONS (USER BREAKOUT BOARD)
 // =================================================================
-#define SDA_PIN 21 // Native Hardware I2C SDA -> ADS1115 SDA (Pin D21)
-#define SCL_PIN 22 // Native Hardware I2C SCL -> ADS1115 SCL (Pin D22)
+#define SDA_PIN 21 // Native Hardware I2C SDA -> ADS1115 #1 & #2 SDA (Pin D21)
+#define SCL_PIN 22 // Native Hardware I2C SCL -> ADS1115 #1 & #2 SCL (Pin D22)
 
 #define RELAY_START_PIN     26 // GPIO 26 -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin D26)
 #define RELAY_HEATER_PIN    27 // GPIO 27 -> Songle Relay IN2 (120V Coolant Heater - Pin D27)
@@ -145,7 +145,8 @@ EthernetClient ethClient;
 WiFiClient wifiClient;
 PubSubClient client;
 
-Adafruit_ADS1115 ads;
+Adafruit_ADS1115 ads1; // Address 0x48 (Engine Sensors & Voltages)
+Adafruit_ADS1115 ads2; // Address 0x49 (5 PSI Hydrostatic Fuel Transducer)
 
 const char* topicCommand     = "kohler/generator-command";
 const char* topicStatus      = "kohler/generator-status";
@@ -195,7 +196,8 @@ unsigned long autoChargerStartTimeMs = 0;
 float minCrankVolts = 15.0;
 String battHealthStr = "HEALTHY";
 
-bool adsPresent = false;
+bool ads1Present = false;
+bool ads2Present = false;
 bool w5500Present = false;
 String runSource = "Stopped";
 unsigned long lastSensorReadTime = 0;
@@ -325,14 +327,18 @@ void setup() {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   }
 
-  // Initialize ADS1115 16-Bit I2C ADC on GPIO 21 (SDA) and GPIO 22 (SCL)
+  // Initialize DUAL ADS1115 16-Bit I2C ADCs on GPIO 21 (SDA) and GPIO 22 (SCL)
   Wire.begin(SDA_PIN, SCL_PIN);
-  if (ads.begin(0x48)) {
-    adsPresent = true;
-    ads.setGain(GAIN_ONE); // +/- 4.096V range
-    Serial.println("ADS1115 16-Bit ADC Initialized Successfully on GPIO 21/22");
-  } else {
-    Serial.println("WARNING: ADS1115 ADC Not Detected on I2C Bus!");
+  if (ads1.begin(0x48)) { // ADS1115 #1 (Engine Sensors & Voltages)
+    ads1Present = true;
+    ads1.setGain(GAIN_ONE); // +/- 4.096V range
+    Serial.println("ADS1115 #1 (0x48 - Engine Sensors) Initialized");
+  }
+
+  if (ads2.begin(0x49)) { // ADS1115 #2 (5 PSI Hydrostatic Fuel Transducer)
+    ads2Present = true;
+    ads2.setGain(GAIN_ONE); // +/- 4.096V range
+    Serial.println("ADS1115 #2 (0x49 - 16-Bit Fuel Transducer) Initialized");
   }
 
   // Setup MQTT Client
@@ -437,22 +443,21 @@ void loop() {
       runSource = "EG4 18kPV Auto-Start";
     }
 
-    // --- B. READ ADS1115 ADC SENSORS ---
+    // --- B. READ ADS1115 ADC #1 (0x48) ENGINE SENSORS & VOLTAGES ---
     float oilPressure = 0.0;
     float batteryVoltage = 0.0;
     float solar48v = 0.0;
-    float fuelLevelPct = 100.0;
 
-    if (adsPresent) {
-      int16_t adc0 = ads.readADC_SingleEnded(0); // A0: Oil Pressure
-      int16_t adc1 = ads.readADC_SingleEnded(1); // A1: Water Temp
-      int16_t adc2 = ads.readADC_SingleEnded(2); // A2: 12V Battery
-      int16_t adc3 = ads.readADC_SingleEnded(3); // A3: 48V Solar Bank
+    if (ads1Present) {
+      int16_t adc0 = ads1.readADC_SingleEnded(0); // A0: Oil Pressure
+      int16_t adc1 = ads1.readADC_SingleEnded(1); // A1: Water Temp
+      int16_t adc2 = ads1.readADC_SingleEnded(2); // A2: 12V Battery
+      int16_t adc3 = ads1.readADC_SingleEnded(3); // A3: 48V Solar Bank
 
-      float volts0 = ads.computeVolts(adc0);
-      float volts1 = ads.computeVolts(adc1);
-      float volts2 = ads.computeVolts(adc2);
-      float volts3 = ads.computeVolts(adc3);
+      float volts0 = ads1.computeVolts(adc0);
+      float volts1 = ads1.computeVolts(adc1);
+      float volts2 = ads1.computeVolts(adc2);
+      float volts3 = ads1.computeVolts(adc3);
 
       oilPressure = (volts0 - 0.5) * (100.0 / 4.0);
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
@@ -482,9 +487,25 @@ void loop() {
       if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
 
-    // --- C. COOLANT HEATER THERMOSTAT CONTROL (Uses 3-Wire Digital Temp Sensor!) ---
+    // --- C. READ ADS1115 ADC #2 (0x49) 16-BIT 5 PSI HYDROSTATIC FUEL TRANSDUCER ---
+    float fuelLevelPct = 100.0;
+    if (ads2Present) {
+      int16_t fuelAdc = ads2.readADC_SingleEnded(0); // 2nd ADS1115 Pin A0 (0.5V - 4.5V Direct Input!)
+      float fuelVolts = ads2.computeVolts(fuelAdc);
+
+      if (fuelVolts >= 0.4) {
+        // Hydrostatic 16-Bit Fuel Percentage: 0.5V = 0% Empty, 4.5V = 100% Full
+        fuelLevelPct = ((fuelVolts - 0.5) / 4.0) * 100.0;
+        if (fuelLevelPct < 0.0) fuelLevelPct = 0.0;
+        if (fuelLevelPct > 100.0) fuelLevelPct = 100.0;
+      } else {
+        fuelLevelPct = 0.0; // Sensor disconnected / empty
+      }
+    }
+
+    // --- D. COOLANT HEATER THERMOSTAT CONTROL (Uses 3-Wire Digital Temp Sensor!) ---
     float activeThermostatTemp = (currentBlockTemp > 1.0) ? currentBlockTemp : currentWaterTemp;
-    if (autoHeaterEnabled && !isGeneratorRunning && activeThermostatTemp > 1.0) {
+    if (autoHeaterEnabled && !isGeneratorRunning && ads1Present && activeThermostatTemp > 1.0) {
       if (activeThermostatTemp <= heaterOnTemp) {
         if (!autoHeaterOn) {
           autoHeaterOn = true;
@@ -506,8 +527,8 @@ void loop() {
     bool finalHeaterState = manualHeaterOn || autoHeaterOn;
     digitalWrite(RELAY_HEATER_PIN, finalHeaterState ? RELAY_ON : RELAY_OFF);
 
-    // --- D. VICTRON 48V-TO-12V SMART CHARGER AUTOMATED CONTROL ---
-    if (autoChargerEnabled && adsPresent && batteryVoltage > 5.0) {
+    // --- E. VICTRON 48V-TO-12V SMART CHARGER AUTOMATED CONTROL ---
+    if (autoChargerEnabled && ads1Present && batteryVoltage > 5.0) {
       if (batteryVoltage <= chargerOnVolts) {
         if (!autoChargerOn) {
           autoChargerOn = true;
@@ -530,7 +551,7 @@ void loop() {
     bool finalChargerState = manualChargerOn || autoChargerOn;
     digitalWrite(VICTRON_CHARGER_PIN, finalChargerState ? HIGH : LOW);
 
-    // --- E. PUBLISH LIVE TELEMETRY TO MOSQUITTO BROKER ---
+    // --- F. PUBLISH LIVE TELEMETRY TO MOSQUITTO BROKER ---
     client.publish(topicStatus, currentStatusStr.c_str());
     client.publish(topicOil, String(oilPressure, 1).c_str());
     client.publish(topicTemp, String(currentWaterTemp, 1).c_str());
