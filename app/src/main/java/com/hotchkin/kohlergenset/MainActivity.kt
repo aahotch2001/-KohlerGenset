@@ -168,6 +168,7 @@ fun GeneratorAppScreen() {
     // Live Telemetry States
     var oilPressure by remember { mutableStateOf("0") }
     var waterTemp by remember { mutableStateOf("0") }
+    var blockTemp by remember { mutableStateOf("0") }
     var batteryVoltage by remember { mutableStateOf("0.0") }
     var solarBattery48v by remember { mutableStateOf("0.0") }
     var fuelLevelPct by remember { mutableStateOf("0") }
@@ -313,6 +314,7 @@ fun GeneratorAppScreen() {
                                             "kohler/burn-rate" -> burnRateGph = payload
                                             "kohler/lifetime-fuel" -> lifetimeFuelGal = payload
                                             "kohler/engine-rpm" -> engineRpm = payload
+                                            "kohler/block-temp" -> blockTemp = payload
                                             "kohler/generator-status" -> {
                                                 val oldStatus = generatorStatus
                                                 generatorStatus = payload
@@ -353,6 +355,7 @@ fun GeneratorAppScreen() {
                     val topics = arrayOf(
                         "kohler/oil-pressure",
                         "kohler/water-temp",
+                        "kohler/block-temp",
                         "kohler/battery-voltage",
                         "kohler/solar-battery-48v",
                         "kohler/fuel-level",
@@ -532,14 +535,22 @@ fun GeneratorAppScreen() {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // GAUGES ROW (Oil, Water, Battery)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                DashboardGauge(title = "Oil Pressure", value = oilPressure, unit = "psi", modifier = Modifier.weight(1f))
-                DashboardGauge(title = "Water Temp", value = waterTemp, unit = "°F", modifier = Modifier.weight(1f))
-                DashboardGauge(title = "Battery", value = batteryVoltage, unit = "V", modifier = Modifier.weight(1f))
+            // GAUGES ROW (Oil, Water Temp, Block Temp, 12V Battery)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DashboardGauge(title = "Oil Pressure", value = oilPressure, unit = "psi", modifier = Modifier.weight(1f))
+                    DashboardGauge(title = "Water Temp", value = waterTemp, unit = "°F", modifier = Modifier.weight(1f))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DashboardGauge(title = "Block Temp", value = blockTemp, unit = "°F", modifier = Modifier.weight(1f))
+                    DashboardGauge(title = "12V Battery", value = batteryVoltage, unit = "V", modifier = Modifier.weight(1f))
+                }
             }
 
             // ENGINE SPEED & FREQUENCY CARD

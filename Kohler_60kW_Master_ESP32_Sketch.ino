@@ -46,12 +46,91 @@ const float TANK_CAPACITY_GALLONS = 100.0;
 // SCLK = Pin D14 (GPIO 14), MOSI = Pin D23 (GPIO 23), SCS/CS = Pin D5 (GPIO 5)
 
 // =================================================================
-// 3. HARDWARE INTERRUPT PULSE COUNTER
+// 3. HARDWARE INTERRUPT PULSE COUNTER & DS18B20 SENSOR READ
 // =================================================================
 volatile unsigned long rpmPulseCount = 0;
 
 void IRAM_ATTR rpmPulseISR() {
   rpmPulseCount++;
+}
+
+// Simple 1-Wire Bit-Bang Temperature Reader for DS18B20 Digital Thermometer on GPIO 25
+float readDS18B20TempF() {
+  uint8_t pin = DS18B20_TEMP_PIN;
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+  delayMicroseconds(500);
+  pinMode(pin, INPUT_PULLUP);
+  delayMicroseconds(70);
+  if (digitalRead(pin) == HIGH) return 0.0; // Sensor not present
+  delayMicroseconds(430);
+
+  // Write 0xCC (Skip ROM) & 0x44 (Convert T)
+  uint8_t cmds[2] = {0xCC, 0x44};
+  for (int c = 0; c < 2; c++) {
+    uint8_t byteVal = cmds[c];
+    for (int b = 0; b < 8; b++) {
+      pinMode(pin, OUTPUT);
+      digitalWrite(pin, LOW);
+      if (byteVal & (1 << b)) {
+        delayMicroseconds(6);
+        pinMode(pin, INPUT_PULLUP);
+        delayMicroseconds(64);
+      } else {
+        delayMicroseconds(60);
+        pinMode(pin, INPUT_PULLUP);
+        delayMicroseconds(10);
+      }
+    }
+  }
+
+  // Delay for conversion
+  delay(10);
+
+  // Reset & Read Scratchpad (0xCC, 0xBE)
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+  delayMicroseconds(500);
+  pinMode(pin, INPUT_PULLUP);
+  delayMicroseconds(70);
+  if (digitalRead(pin) == HIGH) return 0.0;
+  delayMicroseconds(430);
+
+  uint8_t rcmds[2] = {0xCC, 0xBE};
+  for (int c = 0; c < 2; c++) {
+    uint8_t byteVal = rcmds[c];
+    for (int b = 0; b < 8; b++) {
+      pinMode(pin, OUTPUT);
+      digitalWrite(pin, LOW);
+      if (byteVal & (1 << b)) {
+        delayMicroseconds(6);
+        pinMode(pin, INPUT_PULLUP);
+        delayMicroseconds(64);
+      } else {
+        delayMicroseconds(60);
+        pinMode(pin, INPUT_PULLUP);
+        delayMicroseconds(10);
+      }
+    }
+  }
+
+  // Read 16-bit temperature
+  uint16_t tempRaw = 0;
+  for (int b = 0; b < 16; b++) {
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
+    delayMicroseconds(3);
+    pinMode(pin, INPUT_PULLUP);
+    delayMicroseconds(10);
+    if (digitalRead(pin) == HIGH) {
+      tempRaw |= (1 << b);
+    }
+    delayMicroseconds(53);
+  }
+
+  float tempC = (int16_t)tempRaw * 0.0625;
+  if (tempC < -55.0 || tempC > 125.0) return 0.0;
+  return (tempC * 9.0 / 5.0) + 32.0; // Convert °C to °F
 }
 
 // =================================================================
@@ -66,6 +145,7 @@ const char* topicCommand     = "kohler/generator-command";
 const char* topicStatus      = "kohler/generator-status";
 const char* topicOil         = "kohler/oil-pressure";
 const char* topicTemp        = "kohler/water-temp";
+const char* topicBlockTemp   = "kohler/block-temp";
 const char* topicBatt        = "kohler/battery-voltage";
 const char* topicSolar48v    = "kohler/solar-battery-48v";
 const char* topicFuel        = "kohler/fuel-level";
@@ -107,6 +187,7 @@ float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
 float currentWaterTemp = 70.0;
+float currentBlockTemp = 0.0;
 
 // =================================================================
 // 5. MQTT CALLBACK (Receives Commands & Config from Phone App)
@@ -183,9 +264,10 @@ void setup() {
   digitalWrite(RELAY_HEATER_PIN, RELAY_OFF);
   digitalWrite(VICTRON_CHARGER_PIN, LOW); // Victron Charger OFF at boot (0mA standby)
 
-  // Configure Optocoupler Pins
+  // Configure Optocoupler & Digital Temp Sensor Pins
   pinMode(OPT_RPM_SENSE_PIN, INPUT_PULLUP);
   pinMode(OPT_18KPV_PIN, INPUT_PULLUP);
+  pinMode(DS18B20_TEMP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
 
   // Connect Wi-Fi to Home Network / Generator Switch
@@ -258,8 +340,9 @@ void loop() {
   if (now - lastSensorReadTime >= telemetryInterval) {
     lastSensorReadTime = now;
 
-    // --- A. READ OPTOCOUPLERS ---
+    // --- A. READ OPTOCOUPLERS & DS18B20 DIGITAL TEMP SENSOR ---
     bool optInverterStart = (digitalRead(OPT_18KPV_PIN) == LOW);
+    currentBlockTemp = readDS18B20TempF(); // Read 3-wire digital thermometer on GPIO 25
 
     // Calculate RPM & Frequency from Hardware Interrupt
     noInterrupts();
@@ -324,21 +407,22 @@ void loop() {
       currentWaterTemp = 240.0 - (volts1 * 49.0);
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
-      batteryVoltage = volts2 * 7.450;       // Calibrated for 13.70V actual multimeter reading (13.70V actual vs 11.12V displayed)
+      batteryVoltage = volts2 * 7.450;       // Calibrated for 13.70V actual multimeter reading
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
-      solar48v = volts3 * (49.7 / 2.7);       // Calibrated for single 47k + 2.7k divider ratio (18.407 multiplier)
+      solar48v = volts3 * (49.7 / 2.7);       // 47k + 2.7k divider ratio (18.407 multiplier)
       if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
     }
 
-    // --- C. COOLANT HEATER THERMOSTAT CONTROL ---
-    if (autoHeaterEnabled && !isGeneratorRunning && adsPresent && currentWaterTemp > 1.0) {
-      if (currentWaterTemp <= heaterOnTemp) {
+    // --- C. COOLANT HEATER THERMOSTAT CONTROL (Uses 3-Wire Digital Temp Sensor!) ---
+    float activeThermostatTemp = (currentBlockTemp > 1.0) ? currentBlockTemp : currentWaterTemp;
+    if (autoHeaterEnabled && !isGeneratorRunning && activeThermostatTemp > 1.0) {
+      if (activeThermostatTemp <= heaterOnTemp) {
         if (!autoHeaterOn) {
           autoHeaterOn = true;
           autoHeaterStartTimeMs = now;
         }
-      } else if (currentWaterTemp >= heaterOffTemp) {
+      } else if (activeThermostatTemp >= heaterOffTemp) {
         autoHeaterOn = false;
       }
 
@@ -373,6 +457,7 @@ void loop() {
     client.publish(topicStatus, currentStatusStr.c_str());
     client.publish(topicOil, String(oilPressure, 1).c_str());
     client.publish(topicTemp, String(currentWaterTemp, 1).c_str());
+    client.publish(topicBlockTemp, String(currentBlockTemp, 1).c_str());
     client.publish(topicBatt, String(batteryVoltage, 2).c_str());
     client.publish(topicSolar48v, String(solar48v, 1).c_str());
     client.publish(topicFuel, String(fuelLevelPct, 0).c_str());
