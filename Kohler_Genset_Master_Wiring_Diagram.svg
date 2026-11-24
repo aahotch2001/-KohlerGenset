@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="100%" height="100%" style="background-color: #0d0d0d; font-family: sans-serif;">
+  <!-- HEADER -->
+  <rect x="0" y="0" width="1200" height="60" fill="#1b3b22" />
+  <text x="600" y="38" fill="#ffffff" font-size="22" font-weight="bold" text-anchor="middle">KOHLER 60kW GENSET — MASTER HARDWARE WIRING DIAGRAM</text>
+
+  <!-- LEGEND -->
+  <g transform="translate(40, 75)">
+    <rect x="0" y="0" width="1120" height="40" fill="#1e1e1e" rx="6" stroke="#333" />
+    <text x="15" y="25" fill="#aaa" font-size="12" font-weight="bold">WIRE COLORS:</text>
+    <circle cx="120" cy="20" r="6" fill="#f44336"/><text x="132" y="24" fill="#fff" font-size="12">+5V Power</text>
+    <circle cx="220" cy="20" r="6" fill="#444" stroke="#fff"/><text x="232" y="24" fill="#fff" font-size="12">GND Ground</text>
+    <circle cx="330" cy="20" r="6" fill="#4caf50"/><text x="342" y="24" fill="#fff" font-size="12">I2C SDA (Green)</text>
+    <circle cx="460" cy="20" r="6" fill="#ffffff"/><text x="472" y="24" fill="#fff" font-size="12">I2C SCL (White)</text>
+    <circle cx="580" cy="20" r="6" fill="#2196f3"/><text x="592" y="24" fill="#fff" font-size="12">Control Signals (Blue)</text>
+    <circle cx="740" cy="20" r="6" fill="#ffeb3b"/><text x="752" y="24" fill="#fff" font-size="12">Analog Signals (Yellow)</text>
+  </g>
+
+  <!-- MODULE 1: POWER SUPPLY (DROK BUCK CONVERTER) -->
+  <g transform="translate(40, 140)">
+    <rect x="0" y="0" width="220" height="130" fill="#1e1e1e" stroke="#f44336" stroke-width="2" rx="8" />
+    <text x="110" y="25" fill="#f44336" font-size="14" font-weight="bold" text-anchor="middle">DROK BUCK CONVERTER</text>
+    <text x="110" y="45" fill="#aaa" font-size="11" text-anchor="middle">12V DC in ➔ 5.0V DC out</text>
+    <rect x="15" y="60" width="190" height="55" fill="#121212" rx="4" />
+    <text x="25" y="80" fill="#f44336" font-size="11">OUT+ ➔ Soldered 5V Bus Rail</text>
+    <text x="25" y="100" fill="#aaa" font-size="11">OUT- ➔ Common GND Bus Rail</text>
+  </g>
+
+  <!-- MODULE 2: ELEGOO ESP-32 BREAKOUT BOARD -->
+  <g transform="translate(300, 140)">
+    <rect x="0" y="0" width="340" height="420" fill="#1e1e1e" stroke="#2196f3" stroke-width="2" rx="8" />
+    <text x="170" y="28" fill="#2196f3" font-size="16" font-weight="bold" text-anchor="middle">ELEGOO ESP-32 USB-C BOARD</text>
+    <text x="170" y="48" fill="#aaa" font-size="11" text-anchor="middle">30-Pin Expansion Breakout Adapter</text>
+
+    <!-- LEFT TERMINAL ROW -->
+    <rect x="15" y="65" width="145" height="335" fill="#121212" rx="4" />
+    <text x="25" y="85" fill="#f44336" font-size="11" font-weight="bold">VIN  (5.0V Power)</text>
+    <text x="25" y="110" fill="#aaa" font-size="11">GND  (Ground)</text>
+    <text x="25" y="135" fill="#81c784" font-size="11">D14  (W5500 SCLK)</text>
+    <text x="25" y="160" fill="#ffeb3b" font-size="11">D25  (DS18B20 Temp)</text>
+    <text x="25" y="185" fill="#2196f3" font-size="11">D27  (Heater Relay 2)</text>
+    <text x="25" y="210" fill="#2196f3" font-size="11">D26  (Start Relay 1)</text>
+    <text x="25" y="235" fill="#555" font-size="11">D12/13 (Unused)</text>
+    <text x="25" y="260" fill="#555" font-size="11">D32/33 (Unused)</text>
+    <text x="25" y="285" fill="#555" font-size="11">D34/35 (Unused)</text>
+
+    <!-- RIGHT TERMINAL ROW -->
+    <rect x="180" y="65" width="145" height="335" fill="#121212" rx="4" />
+    <text x="190" y="85" fill="#f44336" font-size="11" font-weight="bold">3V3  (3.3V Out)</text>
+    <text x="190" y="110" fill="#aaa" font-size="11">GND  (Ground)</text>
+    <text x="190" y="135" fill="#2196f3" font-size="11">D4   (Victron Pin H)</text>
+    <text x="190" y="160" fill="#81c784" font-size="11">D5   (W5500 CS)</text>
+    <text x="190" y="185" fill="#2196f3" font-size="11">D18  (Terminal W RPM)</text>
+    <text x="190" y="210" fill="#2196f3" font-size="11">D19  (EG4 AutoStart)</text>
+    <text x="190" y="235" fill="#4caf50" font-size="11" font-weight="bold">D21  (I2C SDA)</text>
+    <text x="190" y="260" fill="#ffffff" font-size="11" font-weight="bold">D22  (I2C SCL)</text>
+    <text x="190" y="285" fill="#81c784" font-size="11">D23  (W5500 MOSI)</text>
+  </g>
+
+  <!-- MODULE 3: DUAL ADS1115 ADC BOARDS -->
+  <g transform="translate(680, 140)">
+    <rect x="0" y="0" width="220" height="200" fill="#1e1e1e" stroke="#4caf50" stroke-width="2" rx="8" />
+    <text x="110" y="25" fill="#4caf50" font-size="14" font-weight="bold" text-anchor="middle">ADS1115 ADC #1 (0x48)</text>
+    <rect x="15" y="40" width="190" height="145" fill="#121212" rx="4" />
+    <text x="25" y="60" fill="#ffeb3b" font-size="11">A0: Oil Pressure Sender S</text>
+    <text x="25" y="80" fill="#ffeb3b" font-size="11">A1: Water Temp Sender S</text>
+    <text x="25" y="100" fill="#ffeb3b" font-size="11">A2: 12V Battery (10k/2.2k)</text>
+    <text x="25" y="120" fill="#ffeb3b" font-size="11">A3: 48V Solar (47k/2.7k)</text>
+    <text x="25" y="140" fill="#aaa" font-size="10">ADDR ➔ GND (0x48)</text>
+    <text x="25" y="158" fill="#4caf50" font-size="10">SDA ➔ D21 | SCL ➔ D22</text>
+  </g>
+
+  <g transform="translate(930, 140)">
+    <rect x="0" y="0" width="230" height="200" fill="#1e1e1e" stroke="#4caf50" stroke-width="2" rx="8" />
+    <text x="115" y="25" fill="#4caf50" font-size="14" font-weight="bold" text-anchor="middle">ADS1115 ADC #2 (0x49)</text>
+    <rect x="15" y="40" width="200" height="145" fill="#121212" rx="4" />
+    <text x="25" y="60" fill="#ffeb3b" font-size="11" font-weight="bold">A0: 5 PSI Fuel Transducer</text>
+    <text x="25" y="80" fill="#888" font-size="11">    (0.5V-4.5V Direct Input)</text>
+    <text x="25" y="100" fill="#555" font-size="11">A1, A2, A3: Spare 16-Bit</text>
+    <text x="25" y="140" fill="#f44336" font-size="10">ADDR ➔ 3V3 (0x49)</text>
+    <text x="25" y="158" fill="#4caf50" font-size="10">SDA ➔ D21 | SCL ➔ D22</text>
+  </g>
+
+  <!-- MODULE 4: RELAYS & VICTRON CHARGER -->
+  <g transform="translate(40, 310)">
+    <rect x="0" y="0" width="220" height="250" fill="#1e1e1e" stroke="#ff9800" stroke-width="2" rx="8" />
+    <text x="110" y="25" fill="#ff9800" font-size="14" font-weight="bold" text-anchor="middle">RELAYS &amp; VICTRON</text>
+    <rect x="15" y="40" width="190" height="195" fill="#121212" rx="4" />
+    <text x="25" y="60" fill="#2196f3" font-size="11" font-weight="bold">RELAY 1 (Start Command):</text>
+    <text x="25" y="78" fill="#aaa" font-size="10">IN1  Pin D26 (Active-LOW)</text>
+    <text x="25" y="93" fill="#aaa" font-size="10">COM &amp; NO ➔ Terminals 3 &amp; 4</text>
+
+    <text x="25" y="120" fill="#ff9800" font-size="11" font-weight="bold">RELAY 2 (Coolant Heater):</text>
+    <text x="25" y="138" fill="#aaa" font-size="10">IN2  Pin D27 (Active-LOW)</text>
+    <text x="25" y="153" fill="#aaa" font-size="10">COM(+5V) ➔ NO(+5V to SSR)</text>
+
+    <text x="25" y="180" fill="#4caf50" font-size="11" font-weight="bold">VICTRON 12V CHARGER:</text>
+    <text x="25" y="198" fill="#aaa" font-size="10">Remote Pin H  Pin D4 (3.3V)</text>
+  </g>
+
+  <!-- MODULE 5: PC817 OPTOCOUPLERS & TERMINAL W -->
+  <g transform="translate(680, 370)">
+    <rect x="0" y="0" width="480" height="190" fill="#1e1e1e" stroke="#2196f3" stroke-width="2" rx="8" />
+    <text x="240" y="25" fill="#2196f3" font-size="14" font-weight="bold" text-anchor="middle">PC817 OPTOCOUPLER MODULE &amp; ALTERNATOR TERMINAL 'W'</text>
+    <rect x="15" y="40" width="450" height="135" fill="#121212" rx="4" />
+    <text x="25" y="60" fill="#ffeb3b" font-size="11" font-weight="bold">Alternator Terminal W Signal Input:</text>
+    <text x="25" y="80" fill="#aaa" font-size="11">Terminal W ➔ [1k Ω Resistor] ➔ Ch1 IN+ (With [1N4007 Diode] across IN+ &amp; IN-)</text>
+    <text x="25" y="105" fill="#2196f3" font-size="11" font-weight="bold">PC817 Board Outputs (Pure Isolated Ground Switching - NO VCC Wire!):</text>
+    <text x="25" y="125" fill="#aaa" font-size="11">Ch1 Output O1 ➔ ESP32 Pin D18 (RPM Interrupt) | Ch1 GND ➔ Common GND</text>
+    <text x="25" y="145" fill="#aaa" font-size="11">Ch2 Output O2 ➔ ESP32 Pin D19 (EG4 Inverter AutoStart)</text>
+  </g>
+
+  <!-- TRACE WIRES -->
+  <!-- I2C SDA GREEN -->
+  <path d="M 470 380 L 650 380 L 650 280 L 680 280" fill="none" stroke="#4caf50" stroke-width="3" stroke-dasharray="6 3" />
+  <!-- I2C SCL WHITE -->
+  <path d="M 470 405 L 640 405 L 640 300 L 680 300" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6 3" />
+
+  <text x="600" y="860" fill="#777" font-size="12" text-anchor="middle">Kohler 60kW Genset Master System Schematic</text>
+</svg>
