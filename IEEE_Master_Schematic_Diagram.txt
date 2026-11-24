@@ -1,0 +1,134 @@
+================================================================================
+  KOHLER 60kW GENSET — IEEE SCHEMATIC CIRCUIT DIAGRAM & COMPONENT SYMBOLS
+================================================================================
+
+--------------------------------------------------------------------------------
+1. SCHEMATIC COMPONENT SYMBOL LEGEND
+--------------------------------------------------------------------------------
+  /\/\/\       = Resistor (R)
+  ---||---     = Fixed Ceramic Capacitor (C)
+  ---|\|<|---  = Diode / LED (D)
+  ---[ / ]---  = Mechanical Relay Switch / Contact (COM / NO)
+  ---( m )---  = Relay Inductor Coil / SSR Input
+  ---( V )---  = DC Voltage Source / Battery
+  ---_|_-----  = Common Ground (GND Bus)
+  ---[===]---  = Inline Safety Fuse (F)
+
+--------------------------------------------------------------------------------
+2. POWER SUPPLY & VOLTAGE REGULATION SCHEMATIC
+--------------------------------------------------------------------------------
+ 12V Generator Battery (+) ----[=== 5A Fuse]----+----> DROK Buck Converter [IN+]
+                                                |
+ 12V Generator Battery (-) ---------------------+----> DROK Buck Converter [IN-]
+                                                |
+                                               _|_ (GND)
+
+ DROK Buck Converter Output:
+   [OUT+] --------------------------------------------> +5.0V Soldered Power Bus Rail
+   [OUT-] --------------------------------------------> Common Ground Bus Rail (_|_)
+
+--------------------------------------------------------------------------------
+3. DUAL ADS1115 16-BIT ADC MODULE SCHEMATICS & ANALOG TAP DIVIDERS
+--------------------------------------------------------------------------------
+
+A. ADS1115 Module #1 (Address 0x48 - ADDR connected to GND):
+
+   [VDD]  <------------------------------------------- +5.0V Power Bus Rail
+   [GND]  <------------------------------------------- Common Ground Bus Rail (_|_)
+   [ADDR] <------------------------------------------- Common Ground Bus Rail (_|_)
+   [SDA]  <------------------------------------------- ELEGOO Terminal [D21] (Green Wire)
+   [SCL]  <------------------------------------------- ELEGOO Terminal [D22] (White Wire)
+
+   Channel A0 (Oil Pressure Gauge Sender Terminal 'S'):
+     Kohler Oil Sender [S] ---/\/\/\---(10k Ω)---+---> ADS1115 Pin [A0] (Blue Wire)
+                                                 |
+                                              /\/\/\ (22k Ω Pull-Down)
+                                                 |
+                                              ---||--- (0.1µF / 104 Capacitor)
+                                                 |
+                                                _|_ (Common GND Bus)
+
+   Channel A1 (Water Temperature Gauge Sender Terminal 'S'):
+     Kohler Temp Sender [S] ---/\/\/\---(10k Ω)---+---> ADS1115 Pin [A1] (Purple Wire)
+                                                 |
+                                              /\/\/\ (22k Ω Pull-Down)
+                                                 |
+                                              ---||--- (0.1µF / 104 Capacitor)
+                                                 |
+                                                _|_ (Common GND Bus)
+
+   Channel A2 (12V Starter Battery Voltage Sense):
+     12V Battery (+) ----------/\/\/\---(10k Ω)---+---> ADS1115 Pin [A2] (Green/Yellow Wire)
+                                                 |      [Calibrated Multiplier: 7.450]
+                                              /\/\/\ (2.2k Ω Pull-Down)
+                                                 |
+                                                _|_ (Common GND Bus)
+
+   Channel A3 (48V Solar Battery Bank Voltage Sense):
+     48V Solar Bank (+) -------/\/\/\---(47k Ω)---+---> ADS1115 Pin [A3] (Black/Orange Wire)
+                                                 |      [Calibrated Multiplier: 18.407]
+                                              /\/\/\ (2.7k Ω Pull-Down)
+                                                 |
+                                                _|_ (Common GND Bus)
+
+
+B. ADS1115 Module #2 (Address 0x49 - ADDR connected to 3V3):
+
+   [VDD]  <------------------------------------------- +5.0V Power Bus Rail
+   [GND]  <------------------------------------------- Common Ground Bus Rail (_|_)
+   [ADDR] <------------------------------------------- ELEGOO Terminal [3V3] (Sets Address 0x49)
+   [SDA]  <------------------------------------------- ELEGOO Terminal [D21] (Green Wire - Daisy Chained)
+   [SCL]  <------------------------------------------- ELEGOO Terminal [D22] (White Wire - Daisy Chained)
+
+   Channel A0 (5 PSI Hydrostatic Fuel Level Transducer):
+     5 PSI Fuel Transducer Yellow Wire --------------> ADS1115 #2 Pin [A0] (0.5V-4.5V Direct Input!)
+     5 PSI Fuel Transducer Red Wire -----------------> +5.0V Power Bus Rail
+     5 PSI Fuel Transducer Black Wire ---------------> Common Ground Bus Rail (_|_)
+
+--------------------------------------------------------------------------------
+4. PC817 OPTOCOUPLER MODULE & ALTERNATOR TERMINAL 'W' SCHEMATIC
+--------------------------------------------------------------------------------
+
+Input Side (Alternator Terminal W AC Pulse):
+   Alternator Terminal 'W' ---/\/\/\---(1k Ω)----+----> PC817 Channel 1 [IN1+]
+                                                |
+                                            ---|\|<|--- (1N4007 Diode: Cathode to IN1+, Anode to IN1-)
+                                                |
+                                                +----> PC817 Channel 1 [IN1-]
+                                                |
+                                               _|_ (Common GND Bus)
+
+Output Side (Ground-Switching Phototransistor - NO VCC POWER WIRE NEEDED!):
+   ELEGOO Terminal [D18] ----------------------------> PC817 Channel 1 Output [O1]
+   Common GND Bus Rail (_|_) ------------------------> PC817 Channel 1 Ground [GND]
+
+--------------------------------------------------------------------------------
+5. RELAY MODULES & VICTRON CHARGER SCHEMATICS
+--------------------------------------------------------------------------------
+
+A. Songle Relay 1 (Kohler Engine Crank / Remote Start Circuit):
+   [IN1] <-------------------------------------------- ELEGOO Terminal [D26] (Active-LOW: LOW = ON)
+   [VCC] <-------------------------------------------- +5.0V Power Bus Rail
+   [GND] <-------------------------------------------- Common Ground Bus Rail (_|_)
+   [COM] & [NO] Contacts ----------------------------> Wired across Kohler Panel Terminals [3] & [4]
+
+B. Songle Relay 2 (120V Coolant Block Heater / Circulation Pump Control):
+   [IN2] <-------------------------------------------- ELEGOO Terminal [D27] (Active-LOW: LOW = ON)
+   [VCC] <-------------------------------------------- +5.0V Power Bus Rail
+   [GND] <-------------------------------------------- Common Ground Bus Rail (_|_)
+   [COM] <-------------------------------------------- +5.0V Power Bus Rail
+   [NO]  --------------------------------------------> [BLUE Wire] Outputs +5.0V DC ➔ SSR-40DA [Pin 3 DC+]
+
+C. Victron Orion 48V-to-12V Smart Charger (Solid-State Direct 1-Wire Control):
+   Victron Remote Pin [H] <--------------------------- ELEGOO Terminal [D4] (Direct 3.3V Control)
+   Victron Remote Pin [L] <--------------------------- Common Ground Bus Rail (_|_)
+
+--------------------------------------------------------------------------------
+6. EXTERNAL 3-WIRE DIGITAL TEMPERATURE SENSOR SCHEMATIC (DS18B20)
+--------------------------------------------------------------------------------
+   [RED Wire] (3.3V VCC)   ---------------------------+---> ELEGOO Terminal [3V3]
+                                                      |
+                                                   /\/\/\ (4.7k Ω Pull-Up Resistor)
+                                                      |
+   [YELLOW Wire] (1-Wire Data) -----------------------+---> ELEGOO Terminal [D25]
+   [BLACK Wire] (Ground GND)   ---------------------------> Common Ground Bus Rail (_|_)
