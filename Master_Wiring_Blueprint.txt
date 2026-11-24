@@ -53,6 +53,7 @@ Relay & Charger Control Outputs:
 
 Sensors & Ethernet Module:
    - Terminal [D25]    (Left Row 8th down)   --> [YELLOW] Wire to DS18B20 3-Wire Temp Data (+ 4.7k Ω resistor to 3.3V)
+   - Terminal [D34]    (Left Row 12th down)  <-- [YELLOW] Wire from 5 PSI 0.5V-4.5V Fuel Transducer (via 10k/22k divider)
    - Terminal [D14]    (Left Row 5th down)   --> W5500 SPI Ethernet Module [SCLK] (Clock Line)
    - Terminal [D23]    (Right Row 15th down) --> W5500 SPI Ethernet Module [MOSI] (Data Out Line)
    - Terminal [D5]     (Right Row 8th down)  --> W5500 SPI Ethernet Module [SCS / CS] (Chip Select Line)
