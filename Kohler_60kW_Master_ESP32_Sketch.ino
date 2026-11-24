@@ -161,6 +161,11 @@ const char* topicSetOnTemp   = "kohler/heater-set-on-temp";
 const char* topicSetOffTemp  = "kohler/heater-set-off-temp";
 const char* topicSetMaxMins  = "kohler/heater-set-max-mins";
 
+const char* topicChargerAutoEnable = "kohler/charger-auto-enable";
+const char* topicChargerSetOnVolts = "kohler/charger-set-on-volts";
+const char* topicChargerSetOffVolts = "kohler/charger-set-off-volts";
+const char* topicChargerSetMaxMins = "kohler/charger-set-max-mins";
+
 bool isGeneratorRunning = false;
 bool manualHeaterOn = false;
 bool autoHeaterOn = false;
@@ -168,11 +173,17 @@ bool autoHeaterEnabled = true;
 
 bool manualChargerOn = false;
 bool autoChargerOn = false;
+bool autoChargerEnabled = true;
 
 float heaterOnTemp = 38.0;
 float heaterOffTemp = 50.0;
 unsigned long heaterMaxRunMinutes = 120;
 unsigned long autoHeaterStartTimeMs = 0;
+
+float chargerOnVolts = 12.2;
+float chargerOffVolts = 13.8;
+unsigned long chargerMaxRunMinutes = 120;
+unsigned long autoChargerStartTimeMs = 0;
 
 bool adsPresent = false;
 String runSource = "Stopped";
@@ -234,6 +245,18 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   } else if (String(topic) == topicSetMaxMins) {
     heaterMaxRunMinutes = message.toInt();
     prefs.putULong("maxMins", heaterMaxRunMinutes);
+  } else if (String(topic) == topicChargerAutoEnable) {
+    autoChargerEnabled = (message == "ON");
+    prefs.putBool("autoChgEna", autoChargerEnabled);
+  } else if (String(topic) == topicChargerSetOnVolts) {
+    chargerOnVolts = message.toFloat();
+    prefs.putFloat("chgOnV", chargerOnVolts);
+  } else if (String(topic) == topicChargerSetOffVolts) {
+    chargerOffVolts = message.toFloat();
+    prefs.putFloat("chgOffV", chargerOffVolts);
+  } else if (String(topic) == topicChargerSetMaxMins) {
+    chargerMaxRunMinutes = message.toInt();
+    prefs.putULong("chgMaxM", chargerMaxRunMinutes);
   }
 }
 
@@ -247,12 +270,18 @@ void setup() {
   Serial.println(" KOHLER 60kW GENSET - ELEGOO ESP32 MASTER CONTROLLER");
   Serial.println("=======================================================");
 
-  // Load Saved Thermostat Parameters from NVS Flash
+  // Load Saved Thermostat & Charger Parameters from NVS Flash
   prefs.begin("kohler_cfg", false);
-  autoHeaterEnabled   = prefs.getBool("autoEnable", true);
-  heaterOnTemp        = prefs.getFloat("onTemp", 38.0);
-  heaterOffTemp       = prefs.getFloat("offTemp", 50.0);
-  heaterMaxRunMinutes = prefs.getULong("maxMins", 120);
+  autoHeaterEnabled     = prefs.getBool("autoEnable", true);
+  heaterOnTemp          = prefs.getFloat("onTemp", 38.0);
+  heaterOffTemp         = prefs.getFloat("offTemp", 50.0);
+  heaterMaxRunMinutes   = prefs.getULong("maxMins", 120);
+
+  autoChargerEnabled    = prefs.getBool("autoChgEna", true);
+  chargerOnVolts        = prefs.getFloat("chgOnV", 12.2);
+  chargerOffVolts       = prefs.getFloat("chgOffV", 13.8);
+  chargerMaxRunMinutes  = prefs.getULong("chgMaxM", 120);
+
   lifetimeGallonsBurned = prefs.getFloat("lifetimeFuel", 0.0);
 
   // Configure Relays & Victron Control Pins
@@ -313,6 +342,10 @@ void reconnectMqtt() {
       client.subscribe(topicSetOnTemp);
       client.subscribe(topicSetOffTemp);
       client.subscribe(topicSetMaxMins);
+      client.subscribe(topicChargerAutoEnable);
+      client.subscribe(topicChargerSetOnVolts);
+      client.subscribe(topicChargerSetOffVolts);
+      client.subscribe(topicChargerSetMaxMins);
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
@@ -438,12 +471,21 @@ void loop() {
     bool finalHeaterState = manualHeaterOn || autoHeaterOn;
     digitalWrite(RELAY_HEATER_PIN, finalHeaterState ? RELAY_ON : RELAY_OFF);
 
-    // --- D. VICTRON 48V-TO-12V SMART CHARGER CONTROL ---
-    if (adsPresent && batteryVoltage > 5.0) {
-      if (batteryVoltage <= 12.3) {
-        autoChargerOn = true; // Turn ON Victron charger when 12V battery drops <= 12.3V
-      } else if (batteryVoltage >= 13.8) {
-        autoChargerOn = false; // Turn OFF Victron charger when 12V battery reaches 13.8V (Fully Charged)
+    // --- D. VICTRON 48V-TO-12V SMART CHARGER AUTOMATED CONTROL ---
+    if (autoChargerEnabled && adsPresent && batteryVoltage > 5.0) {
+      if (batteryVoltage <= chargerOnVolts) {
+        if (!autoChargerOn) {
+          autoChargerOn = true;
+          autoChargerStartTimeMs = now;
+        }
+      } else if (batteryVoltage >= chargerOffVolts) {
+        autoChargerOn = false;
+      }
+
+      // Safety Max Charge Time Protection
+      if (autoChargerOn && (now - autoChargerStartTimeMs >= (chargerMaxRunMinutes * 60000))) {
+        autoChargerOn = false;
+        Serial.println("VICTRON CHARGER: Max charge time limit reached! Charger turned OFF.");
       }
     } else {
       autoChargerOn = false;

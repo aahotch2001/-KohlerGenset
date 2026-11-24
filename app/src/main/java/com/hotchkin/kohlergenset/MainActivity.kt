@@ -165,6 +165,12 @@ fun GeneratorAppScreen() {
     var heaterOffTemp by remember { mutableStateOf(prefs.getString("heater_off_temp", "50") ?: "50") }
     var heaterMaxMins by remember { mutableStateOf(prefs.getString("heater_max_mins", "120") ?: "120") }
 
+    // Victron Smart Charger Custom Settings State
+    var autoChargerEnabled by remember { mutableStateOf(prefs.getBoolean("auto_charger_enable", true)) }
+    var chargerOnVolts by remember { mutableStateOf(prefs.getString("charger_on_volts", "12.2") ?: "12.2") }
+    var chargerOffVolts by remember { mutableStateOf(prefs.getString("charger_off_volts", "13.8") ?: "13.8") }
+    var chargerMaxMins by remember { mutableStateOf(prefs.getString("charger_max_mins", "120") ?: "120") }
+
     // Live Telemetry States
     var oilPressure by remember { mutableStateOf("0") }
     var waterTemp by remember { mutableStateOf("0") }
@@ -417,6 +423,28 @@ fun GeneratorAppScreen() {
                 }
             }
         }
+    }
+
+    fun publishChargerConfig() {
+        val client = mqttClient
+        if (client != null && client.isConnected) {
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    client.publish("kohler/charger-auto-enable", MqttMessage((if (autoChargerEnabled) "ON" else "OFF").toByteArray()))
+                    client.publish("kohler/charger-set-on-volts", MqttMessage(chargerOnVolts.toByteArray()))
+                    client.publish("kohler/charger-set-off-volts", MqttMessage(chargerOffVolts.toByteArray()))
+                    client.publish("kohler/charger-set-max-mins", MqttMessage(chargerMaxMins.toByteArray()))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    fun toggleAutoCharger(enabled: Boolean) {
+        autoChargerEnabled = enabled
+        prefs.edit().putBoolean("auto_charger_enable", enabled).apply()
+        publishChargerConfig()
     }
 
     fun sendCommand(cmd: String) {
@@ -827,14 +855,15 @@ fun GeneratorAppScreen() {
                     Text("Victron 48V-to-12V Smart Charger", color = Color.White, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Manual 12V Charger Override Toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("12V Charger Control", color = Color.White, fontWeight = FontWeight.SemiBold)
-                            val chargerDesc = if (victronChargerOn) "CHARGING (< 12.3V ➔ 13.8V)" else "OFF (0mA 48V Standby Drain)"
+                            Text("Manual 12V Charger Override", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            val chargerDesc = if (victronChargerOn) "CHARGER ACTIVE" else "OFF (0mA 48V Standby)"
                             Text(chargerDesc, color = if (victronChargerOn) Color(0xFF4CAF50) else Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                         }
                         Switch(
@@ -842,6 +871,29 @@ fun GeneratorAppScreen() {
                             onCheckedChange = { isChecked ->
                                 victronChargerOn = isChecked
                                 toggleVictronCharger(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0xFF333333))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Auto Smart Charging Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Auto Smart 12V Charging", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("Auto < ${chargerOnVolts}V ➔ ${chargerOffVolts}V (Max ${chargerMaxMins}m)", color = Color.LightGray, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                        }
+                        Switch(
+                            checked = autoChargerEnabled,
+                            onCheckedChange = { isChecked ->
+                                toggleAutoCharger(isChecked)
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF4CAF50))
                         )
@@ -939,6 +991,28 @@ fun GeneratorAppScreen() {
                         )
 
                         HorizontalDivider(color = Color(0xFF333333))
+                        Text("Victron 48V-to-12V Smart Charger:", color = Color.White, fontWeight = FontWeight.Bold)
+
+                        OutlinedTextField(
+                            value = chargerOnVolts,
+                            onValueChange = { chargerOnVolts = it },
+                            label = { Text("Low Volts Turn-ON (V)") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = chargerOffVolts,
+                            onValueChange = { chargerOffVolts = it },
+                            label = { Text("High Volts Turn-OFF (V)") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = chargerMaxMins,
+                            onValueChange = { chargerMaxMins = it },
+                            label = { Text("Max Charge Time (Minutes)") },
+                            singleLine = true
+                        )
+
+                        HorizontalDivider(color = Color(0xFF333333))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -991,10 +1065,15 @@ fun GeneratorAppScreen() {
                             .putString("heater_on_temp", heaterOnTemp.trim())
                             .putString("heater_off_temp", heaterOffTemp.trim())
                             .putString("heater_max_mins", heaterMaxMins.trim())
+                            .putString("charger_on_volts", chargerOnVolts.trim())
+                            .putString("charger_off_volts", chargerOffVolts.trim())
+                            .putString("charger_max_mins", chargerMaxMins.trim())
+                            .putBoolean("auto_charger_enable", autoChargerEnabled)
                             .apply()
                         showSettingsDialog = false
                         connectMqtt()
                         publishHeaterConfig()
+                        publishChargerConfig()
                     }) {
                         Text("Save & Apply")
                     }
