@@ -1,3 +1,5 @@
+#include <SPI.h>
+#include <Ethernet.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
@@ -7,9 +9,9 @@
 Preferences prefs;
 
 // =================================================================
-// 1. ELEGOO ESP-32 USB-C BOARD & NETWORK CONFIG
+// 1. ELEGOO ESP-32 USB-C BOARD & DUAL NETWORK CONFIG
 // =================================================================
-// Wi-Fi Credentials (Connects to Home Wi-Fi / Router at Generator Site)
+// Wi-Fi Credentials (Connects as automatic backup if Ethernet is unplugged)
 const char* WIFI_SSID     = "YOUR_WIFI_NAME";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
@@ -42,8 +44,11 @@ const float TANK_CAPACITY_GALLONS = 100.0;
 #define OPT_RPM_SENSE_PIN   18 // GPIO 18 -> PC817 Ch1 Output (Alternator Terminal W RPM - Pin D18)
 #define OPT_18KPV_PIN       19 // GPIO 19 -> PC817 Ch2 Output (EG4 Inverter Auto-Start - Pin D19)
 
-// W5500 SPI Ethernet Module Pins (Reference):
-// SCLK = Pin D14 (GPIO 14), MOSI = Pin D23 (GPIO 23), SCS/CS = Pin D5 (GPIO 5)
+// W5500 SPI Ethernet Module Pins:
+#define W5500_SCLK_PIN 14 // Pin D14 (GPIO 14 - SPI Clock)
+#define W5500_MISO_PIN 12 // Pin D12 (GPIO 12 - SPI MISO)
+#define W5500_MOSI_PIN 23 // Pin D23 (GPIO 23 - SPI MOSI)
+#define W5500_CS_PIN   5  // Pin D5  (GPIO 5  - SPI SCS/CS)
 
 // =================================================================
 // 3. HARDWARE INTERRUPT PULSE COUNTER & DS18B20 SENSOR READ
@@ -136,8 +141,9 @@ float readDS18B20TempF() {
 // =================================================================
 // 4. HARDWARE OBJECTS & LOCAL KOHLER MQTT TOPICS
 // =================================================================
+EthernetClient ethClient;
 WiFiClient wifiClient;
-PubSubClient client(wifiClient);
+PubSubClient client;
 
 Adafruit_ADS1115 ads;
 
@@ -147,6 +153,7 @@ const char* topicOil         = "kohler/oil-pressure";
 const char* topicTemp        = "kohler/water-temp";
 const char* topicBlockTemp   = "kohler/block-temp";
 const char* topicBatt        = "kohler/battery-voltage";
+const char* topicBattHealth  = "kohler/battery-health";
 const char* topicSolar48v    = "kohler/solar-battery-48v";
 const char* topicFuel        = "kohler/fuel-level";
 const char* topicBurnRate    = "kohler/burn-rate";
@@ -165,7 +172,6 @@ const char* topicChargerAutoEnable = "kohler/charger-auto-enable";
 const char* topicChargerSetOnVolts = "kohler/charger-set-on-volts";
 const char* topicChargerSetOffVolts = "kohler/charger-set-off-volts";
 const char* topicChargerSetMaxMins = "kohler/charger-set-max-mins";
-const char* topicBattHealth  = "kohler/battery-health";
 
 bool isGeneratorRunning = false;
 bool manualHeaterOn = false;
@@ -175,9 +181,6 @@ bool autoHeaterEnabled = true;
 bool manualChargerOn = false;
 bool autoChargerOn = false;
 bool autoChargerEnabled = true;
-
-float minCrankVolts = 15.0;
-String battHealthStr = "HEALTHY";
 
 float heaterOnTemp = 38.0;
 float heaterOffTemp = 50.0;
@@ -189,7 +192,11 @@ float chargerOffVolts = 13.8;
 unsigned long chargerMaxRunMinutes = 120;
 unsigned long autoChargerStartTimeMs = 0;
 
+float minCrankVolts = 15.0;
+String battHealthStr = "HEALTHY";
+
 bool adsPresent = false;
+bool w5500Present = false;
 String runSource = "Stopped";
 unsigned long lastSensorReadTime = 0;
 unsigned long crankStartTimeMs = 0;
@@ -303,10 +310,20 @@ void setup() {
   pinMode(DS18B20_TEMP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
 
-  // Connect Wi-Fi to Home Network / Generator Switch
-  Serial.print("Connecting to Wi-Fi SSID: ");
-  Serial.println(WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  // Initialize W5500 SPI Ethernet Module on Pins D14 (SCLK), D23 (MOSI), D12 (MISO), D5 (CS)
+  SPI.begin(W5500_SCLK_PIN, W5500_MISO_PIN, W5500_MOSI_PIN, W5500_CS_PIN);
+  Ethernet.init(W5500_CS_PIN);
+  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+  if (Ethernet.begin(mac) != 0) {
+    w5500Present = true;
+    client.setClient(ethClient);
+    Serial.print("W5500 Ethernet Connected! IP Address: ");
+    Serial.println(Ethernet.localIP());
+  } else {
+    Serial.println("W5500 Ethernet link disconnected or searching. Enabling Wi-Fi backup...");
+    client.setClient(wifiClient);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  }
 
   // Initialize ADS1115 16-Bit I2C ADC on GPIO 21 (SDA) and GPIO 22 (SCL)
   Wire.begin(SDA_PIN, SCL_PIN);
@@ -328,8 +345,8 @@ void setup() {
 // =================================================================
 void reconnectMqtt() {
   while (!client.connected()) {
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("Waiting for Wi-Fi Connection...");
+    if (!w5500Present && WiFi.status() != WL_CONNECTED) {
+      Serial.println("Waiting for Network Connection...");
       delay(2000);
       continue;
     }
