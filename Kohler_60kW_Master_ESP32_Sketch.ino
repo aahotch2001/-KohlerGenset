@@ -324,7 +324,7 @@ void loop() {
       currentWaterTemp = 240.0 - (volts1 * 49.0);
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
-      batteryVoltage = volts2 * 6.047;       // Calibrated for 10k/2.2k divider (13.60V actual)
+      batteryVoltage = volts2 * 7.450;       // Calibrated for 13.70V actual multimeter reading (13.70V actual vs 11.12V displayed)
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
       solar48v = volts3 * (49.7 / 2.7);       // Calibrated for single 47k + 2.7k divider ratio (18.407 multiplier)
