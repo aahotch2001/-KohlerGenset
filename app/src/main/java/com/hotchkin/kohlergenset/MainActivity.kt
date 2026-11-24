@@ -516,7 +516,7 @@ fun GeneratorAppScreen() {
         containerColor = Color(0xFF0D0D0D),
         topBar = {
             TopAppBar(
-                title = { Text("Generator", fontWeight = FontWeight.Bold) },
+                title = { Text("Genset", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Text("⚙", fontSize = MaterialTheme.typography.titleLarge.fontSize, color = Color.White)
