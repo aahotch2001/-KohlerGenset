@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" width="100%" height="100%" style="background-color: #fdfdfd; font-family: 'Courier New', Courier, monospace;">
+  <!-- EDA GRID PATTERN -->
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="1100" fill="url(#grid)" />
+
+  <!-- TITLE BLOCK (KiCad / EasyEDA Style) -->
+  <g transform="translate(1150, 950)">
+    <rect x="0" y="0" width="410" height="110" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    <line x1="0" y1="30" x2="410" y2="30" stroke="#000" stroke-width="1.5"/>
+    <line x1="0" y1="70" x2="410" y2="70" stroke="#000" stroke-width="1.5"/>
+    <line x1="250" y1="70" x2="250" y2="110" stroke="#000" stroke-width="1.5"/>
+    <text x="15" y="20" fill="#000" font-size="14" font-weight="bold">TITLE: KOHLER 60kW GENSET CONTROLLER</text>
+    <text x="15" y="52" fill="#000" font-size="13">SCHEMATIC: DUAL ADS1115 + PC817 + VICTRON</text>
+    <text x="15" y="92" fill="#000" font-size="11">DATE: 2026-11-21 | REV: 3.0</text>
+    <text x="260" y="92" fill="#000" font-size="11">SHEET: 1 OF 1</text>
+  </g>
+
+  <!-- POWER BUS RAILS -->
+  <!-- +5V POWER BUS (RED) -->
+  <line x1="100" y1="60" x2="1500" y2="60" stroke="#cc0000" stroke-width="3"/>
+  <text x="110" y="50" fill="#cc0000" font-size="14" font-weight="bold">+5.0V POWER BUS RAIL</text>
+
+  <!-- COMMON GROUND BUS (BLACK) -->
+  <line x1="100" y1="1020" x2="1500" y2="1020" stroke="#000000" stroke-width="3"/>
+  <text x="110" y="1040" fill="#000000" font-size="14" font-weight="bold">COMMON GROUND BUS RAIL (GND)</text>
+
+  <!-- 1. DROK BUCK CONVERTER IC BLOCK -->
+  <g transform="translate(100, 120)">
+    <rect x="0" y="0" width="180" height="120" fill="#ffffff" stroke="#0000cc" stroke-width="2" />
+    <text x="90" y="22" fill="#0000cc" font-size="12" font-weight="bold" text-anchor="middle">DROK LM2596 BUCK</text>
+    <line x1="0" y1="30" x2="180" y2="30" stroke="#0000cc" stroke-width="1"/>
+    <text x="15" y="55" fill="#000" font-size="11">IN+  12V Batt (+)</text>
+    <text x="15" y="75" fill="#000" font-size="11">IN-  12V Batt (-)</text>
+    <text x="15" y="95" fill="#cc0000" font-size="11" font-weight="bold">OUT+ ➔ +5V Rail</text>
+    <text x="15" y="110" fill="#000000" font-size="11" font-weight="bold">OUT- ➔ GND Rail</text>
+  </g>
+
+  <!-- 2. ELEGOO ESP-32 DEV BOARD IC BLOCK -->
+  <g transform="translate(380, 120)">
+    <rect x="0" y="0" width="380" height="780" fill="#ffffff" stroke="#000000" stroke-width="2.5" />
+    <text x="190" y="28" fill="#000000" font-size="16" font-weight="bold" text-anchor="middle">U1: ELEGOO ESP32 DEV BOARD</text>
+    <line x1="0" y1="40" x2="380" y2="40" stroke="#000000" stroke-width="1.5"/>
+
+    <!-- LEFT PINS -->
+    <g font-size="11" fill="#000">
+      <text x="15" y="70">1: VIN (5.0V Input)</text><circle cx="5" cy="66" r="3" fill="#cc0000"/>
+      <text x="15" y="100">2: GND (Ground)</text><circle cx="5" cy="96" r="3" fill="#000"/>
+      <text x="15" y="130">3: D14 (SPI SCLK W5500)</text><circle cx="5" cy="126" r="3" fill="#009900"/>
+      <text x="15" y="160">4: D25 (DS18B20 Temp Data)</text><circle cx="5" cy="156" r="3" fill="#cc6600"/>
+      <text x="15" y="190">5: D27 (Heater Relay 2 IN2)</text><circle cx="5" cy="186" r="3" fill="#0066cc"/>
+      <text x="15" y="220">6: D26 (Start Relay 1 IN1)</text><circle cx="5" cy="216" r="3" fill="#0066cc"/>
+      <text x="15" y="250">7: D34 (Fuel Transducer Alt)</text><circle cx="5" cy="246" r="3" fill="#cc00cc"/>
+      <text x="15" y="280">8: D12 (SPI MISO W5500)</text><circle cx="5" cy="276" r="3" fill="#888"/>
+      <text x="15" y="310">9: D13 (Spare GPIO)</text><circle cx="5" cy="306" r="3" fill="#888"/>
+    </g>
+
+    <!-- RIGHT PINS -->
+    <g font-size="11" fill="#000" text-anchor="end">
+      <text x="365" y="70">3V3 (3.3V Power Out) :16</text><circle cx="375" cy="66" r="3" fill="#cc0000"/>
+      <text x="365" y="100">GND (Ground) :17</text><circle cx="375" cy="96" r="3" fill="#000"/>
+      <text x="365" y="130">D4 (Victron Remote H) :18</text><circle cx="375" cy="126" r="3" fill="#0066cc"/>
+      <text x="365" y="160">D5 (SPI CS W5500) :19</text><circle cx="375" cy="156" r="3" fill="#009900"/>
+      <text x="365" y="190">D18 (PC817 O1 Terminal W) :20</text><circle cx="375" cy="186" r="3" fill="#0066cc"/>
+      <text x="365" y="220">D19 (PC817 O2 EG4 Auto) :21</text><circle cx="375" cy="216" r="3" fill="#0066cc"/>
+      <text x="365" y="250">D21 (I2C SDA) :22</text><circle cx="375" cy="246" r="3" fill="#009900"/>
+      <text x="365" y="280">D22 (I2C SCL) :23</text><circle cx="375" cy="276" r="3" fill="#009900"/>
+      <text x="365" y="310">D23 (SPI MOSI W5500) :24</text><circle cx="375" cy="306" r="3" fill="#009900"/>
+    </g>
+  </g>
+
+  <!-- 3. ADS1115 MODULE #1 (0x48) -->
+  <g transform="translate(850, 120)">
+    <rect x="0" y="0" width="280" height="260" fill="#ffffff" stroke="#009900" stroke-width="2" />
+    <text x="140" y="22" fill="#009900" font-size="13" font-weight="bold" text-anchor="middle">U2: ADS1115 ADC #1 (0x48)</text>
+    <line x1="0" y1="30" x2="280" y2="30" stroke="#009900" stroke-width="1"/>
+    <g font-size="11" fill="#000">
+      <text x="15" y="55">VDD  +5V Rail</text>
+      <text x="15" y="75">GND  Common GND</text>
+      <text x="15" y="95">ADDR ➔ GND (0x48)</text>
+      <text x="15" y="115" fill="#009900" font-weight="bold">SDA  ESP32 D21</text>
+      <text x="15" y="135" fill="#009900" font-weight="bold">SCL  ESP32 D22</text>
+      <line x1="0" y1="145" x2="280" y2="145" stroke="#ccc"/>
+      <text x="15" y="165" fill="#cc6600">A0  Oil Sender S (Blue Wire)</text>
+      <text x="15" y="185" fill="#cc6600">A1  Temp Sender S (Purple Wire)</text>
+      <text x="15" y="205" fill="#cc6600">A2  12V Batt (Grn/Yel Wire)</text>
+      <text x="15" y="225" fill="#cc6600">A3  48V Solar (Blk/Org Wire)</text>
+    </g>
+  </g>
+
+  <!-- 4. ADS1115 MODULE #2 (0x49) -->
+  <g transform="translate(1200, 120)">
+    <rect x="0" y="0" width="280" height="260" fill="#ffffff" stroke="#009900" stroke-width="2" />
+    <text x="140" y="22" fill="#009900" font-size="13" font-weight="bold" text-anchor="middle">U3: ADS1115 ADC #2 (0x49)</text>
+    <line x1="0" y1="30" x2="280" y2="30" stroke="#009900" stroke-width="1"/>
+    <g font-size="11" fill="#000">
+      <text x="15" y="55">VDD  +5V Rail</text>
+      <text x="15" y="75">GND  Common GND</text>
+      <text x="15" y="95" fill="#cc0000" font-weight="bold">ADDR ➔ 3V3 (0x49)</text>
+      <text x="15" y="115" fill="#009900" font-weight="bold">SDA  ESP32 D21</text>
+      <text x="15" y="135" fill="#009900" font-weight="bold">SCL  ESP32 D22</text>
+      <line x1="0" y1="145" x2="280" y2="145" stroke="#ccc"/>
+      <text x="15" y="165" fill="#cc00cc" font-weight="bold">A0  5 PSI Fuel Transducer</text>
+      <text x="15" y="185" fill="#888">    (0.5V-4.5V Direct Input)</text>
+      <text x="15" y="210" fill="#888">A1, A2, A3: Spare Channels</text>
+    </g>
+  </g>
+
+  <!-- 5. ANALOG VOLTAGE DIVIDER SCHEMATIC BOX -->
+  <g transform="translate(850, 420)">
+    <rect x="0" y="0" width="630" height="230" fill="#ffffff" stroke="#cc6600" stroke-width="2" />
+    <text x="315" y="22" fill="#cc6600" font-size="13" font-weight="bold" text-anchor="middle">RESISTOR DIVIDERS &amp; FILTER SCHEMATICS</text>
+    <line x1="0" y1="30" x2="630" y2="30" stroke="#cc6600" stroke-width="1"/>
+
+    <!-- A2: 12V BATT DIVIDER -->
+    <g transform="translate(20, 50)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#000">12V Batt (+)</text>
+      <line x1="80" y1="-4" x2="110" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <!-- RESISTOR 10k -->
+      <path d="M 110 -4 L 115 -10 L 125 2 L 135 -10 L 145 2 L 155 -10 L 160 -4" fill="none" stroke="#000" stroke-width="1.5"/>
+      <text x="120" y="-15" font-size="9">10k Ω</text>
+      <line x1="160" y1="-4" x2="200" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <circle cx="200" cy="-4" r="3" fill="#000"/>
+      <text x="210" y="0" fill="#009900" font-weight="bold">➔ ADC #1 A2</text>
+      <!-- PULLDOWN 2.2k -->
+      <line x1="200" y1="-4" x2="200" y2="20" stroke="#000" stroke-width="1.5"/>
+      <path d="M 200 20 L 194 25 L 206 35 L 194 45 L 206 55 L 194 65 L 200 70" fill="none" stroke="#000" stroke-width="1.5"/>
+      <text x="212" y="45" font-size="9">2.2k Ω</text>
+      <line x1="200" y1="70" x2="200" y2="90" stroke="#000" stroke-width="1.5"/>
+      <!-- GND -->
+      <line x1="190" y1="90" x2="210" y2="90" stroke="#000" stroke-width="1.5"/>
+      <line x1="194" y1="94" x2="206" y2="94" stroke="#000" stroke-width="1.5"/>
+      <line x1="198" y1="98" x2="202" y2="98" stroke="#000" stroke-width="1.5"/>
+    </g>
+
+    <!-- A3: 48V SOLAR DIVIDER -->
+    <g transform="translate(340, 50)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#000">48V Solar (+)</text>
+      <line x1="80" y1="-4" x2="110" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <!-- RESISTOR 47k -->
+      <path d="M 110 -4 L 115 -10 L 125 2 L 135 -10 L 145 2 L 155 -10 L 160 -4" fill="none" stroke="#000" stroke-width="1.5"/>
+      <text x="120" y="-15" font-size="9">47k Ω</text>
+      <line x1="160" y1="-4" x2="200" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <circle cx="200" cy="-4" r="3" fill="#000"/>
+      <text x="210" y="0" fill="#009900" font-weight="bold">➔ ADC #1 A3</text>
+      <!-- PULLDOWN 2.7k -->
+      <line x1="200" y1="-4" x2="200" y2="20" stroke="#000" stroke-width="1.5"/>
+      <path d="M 200 20 L 194 25 L 206 35 L 194 45 L 206 55 L 194 65 L 200 70" fill="none" stroke="#000" stroke-width="1.5"/>
+      <text x="212" y="45" font-size="9">2.7k Ω</text>
+      <line x1="200" y1="70" x2="200" y2="90" stroke="#000" stroke-width="1.5"/>
+      <!-- GND -->
+      <line x1="190" y1="90" x2="210" y2="90" stroke="#000" stroke-width="1.5"/>
+      <line x1="194" y1="94" x2="206" y2="94" stroke="#000" stroke-width="1.5"/>
+      <line x1="198" y1="98" x2="202" y2="98" stroke="#000" stroke-width="1.5"/>
+    </g>
+  </g>
+
+  <!-- 6. PC817 OPTOCOUPLER MODULE SCHEMATIC BOX -->
+  <g transform="translate(850, 680)">
+    <rect x="0" y="0" width="630" height="220" fill="#ffffff" stroke="#0066cc" stroke-width="2" />
+    <text x="315" y="22" fill="#0066cc" font-size="13" font-weight="bold" text-anchor="middle">PC817 OPTOCOUPLER MODULE (ISOLATED GROUND-SWITCHING)</text>
+    <line x1="0" y1="30" x2="630" y2="30" stroke="#0066cc" stroke-width="1"/>
+
+    <g transform="translate(20, 50)" font-size="11">
+      <text x="0" y="0" font-weight="bold">Alternator Terminal W (AC Signal)</text>
+      <line x1="210" y1="-4" x2="240" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <path d="M 240 -4 L 245 -10 L 255 2 L 265 -10 L 275 2 L 285 -10 L 290 -4" fill="none" stroke="#000" stroke-width="1.5"/>
+      <text x="250" y="-15" font-size="9">1k Ω</text>
+      <line x1="290" y1="-4" x2="330" y2="-4" stroke="#000" stroke-width="1.5"/>
+      <text x="335" y="0" font-weight="bold">➔ PC817 Ch1 IN1+</text>
+
+      <!-- REVERSE PROTECTION DIODE 1N4007 -->
+      <g transform="translate(450, -20)">
+        <text x="0" y="0" font-size="10" fill="#cc0000">1N4007 Diode across IN1+ &amp; IN1-</text>
+        <line x1="20" y1="10" x2="80" y2="10" stroke="#000" stroke-width="1.5"/>
+        <polygon points="50,0 50,20 70,10" fill="#000"/>
+        <line x1="70" y1="0" x2="70" y2="20" stroke="#000" stroke-width="2"/>
+      </g>
+
+      <text x="0" y="70" font-weight="bold" fill="#0066cc">Output O1 ➔ ESP32 D18 (RPM Interrupt)</text>
+      <text x="0" y="90" font-weight="bold" fill="#000">Output GND ➔ Common Ground Bus Rail (NO VCC WIRE NEEDED!)</text>
+    </g>
+  </g>
+
+  <!-- 7. RELAYS & VICTRON CHARGER SCHEMATIC BOX -->
+  <g transform="translate(100, 270)">
+    <rect x="0" y="0" width="220" height="630" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    <text x="110" y="22" fill="#000000" font-size="13" font-weight="bold" text-anchor="middle">RELAYS &amp; VICTRON</text>
+    <line x1="0" y1="30" x2="220" y2="30" stroke="#000" stroke-width="1"/>
+
+    <!-- RELAY 1 -->
+    <g transform="translate(15, 50)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#0066cc">SONGLE RELAY 1 (Start):</text>
+      <text x="0" y="20">IN1  ESP32 Pin D26</text>
+      <text x="0" y="40">COM &amp; NO Contacts</text>
+      <text x="0" y="55" fill="#cc0000">➔ Kohler Terminals 3 &amp; 4</text>
+    </g>
+
+    <!-- RELAY 2 -->
+    <g transform="translate(15, 140)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#0066cc">SONGLE RELAY 2 (Heater):</text>
+      <text x="0" y="20">IN2  ESP32 Pin D27</text>
+      <text x="0" y="40">COM  +5V Power Bus Rail</text>
+      <text x="0" y="60" fill="#cc0000" font-weight="bold">NO ➔ +5V Out to SSR-40DA</text>
+      <text x="0" y="75" fill="#888">    / Circulation Pump</text>
+    </g>
+
+    <!-- VICTRON CHARGER -->
+    <g transform="translate(15, 250)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#009900">VICTRON 12V CHARGER:</text>
+      <text x="0" y="20">Remote Pin H  Pin D4</text>
+      <text x="0" y="40">Remote Pin L ➔ Common GND</text>
+      <text x="0" y="60" fill="#009900">(Direct 3.3V Control!)</text>
+    </g>
+
+    <!-- 3-WIRE TEMP SENSOR -->
+    <g transform="translate(15, 360)" font-size="11">
+      <text x="0" y="0" font-weight="bold" fill="#cc6600">3-WIRE TEMP (DS18B20):</text>
+      <text x="0" y="20">Red (VCC)  3.3V Power</text>
+      <text x="0" y="40">Black (GND) ➔ Common GND</text>
+      <text x="0" y="60">Yellow (Data) ➔ Pin D25</text>
+      <text x="0" y="80" fill="#cc0000">(4.7k Ω Pull-Up to 3.3V)</text>
+    </g>
+  </g>
+
+</svg>
