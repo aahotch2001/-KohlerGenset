@@ -373,9 +373,15 @@ fun GeneratorAppScreen() {
         }
     }
 
-    // Auto connect on launch
+    // Auto connect on launch & continuous 5s auto-reconnect loop when disconnected
     LaunchedEffect(mqttHost, mqttUsername, mqttPassword) {
-        connectMqtt()
+        while (true) {
+            val client = mqttClient
+            if (client == null || !client.isConnected) {
+                connectMqtt()
+            }
+            delay(5000)
+        }
     }
 
     fun publishHeaterConfig() {
@@ -482,6 +488,7 @@ fun GeneratorAppScreen() {
                     Surface(
                         color = badgeColor,
                         shape = RoundedCornerShape(16.dp),
+                        onClick = { connectMqtt() },
                         modifier = Modifier.padding(end = 16.dp)
                     ) {
                         Text(
