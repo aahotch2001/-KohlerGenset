@@ -136,7 +136,9 @@ float readDS18B20TempF() {
 
   float tempC = (int16_t)tempRaw * 0.0625;
   if (tempC < -55.0 || tempC > 125.0) return 0.0;
-  return (tempC * 9.0 / 5.0) + 32.0; // Convert °C to °F
+
+  float rawF = (tempC * 9.0 / 5.0) + 32.0;
+  return rawF + 5.2; // Calibrated for 37.1°F actual (from 31.9°F raw)
 }
 
 // =================================================================
@@ -347,7 +349,7 @@ void setup() {
   } else {
     w5500Present = true;
     client.setClient(ethClient);
-    Serial.print("W5500 Hardwired Ethernet ACTIVE! IP: ");
+    Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
     Serial.println(Ethernet.localIP());
   }
 
@@ -433,7 +435,7 @@ void loop() {
     unsigned long pulses = rpmPulseCount;
     rpmPulseCount = 0;
     interrupts();
-    currentRpm = (pulses * 60) / 2; // Assuming 2 pulses per revolution
+    currentRpm = (pulses * 60) / 22; // Calibrated for 22 pulses per engine revolution (1800 RPM actual)
 
     // 15-SECOND OVER-CRANK SAFETY PROTECTION
     if (startRelayEngaged && (currentRpm <= 400) && (now - crankStartTimeMs >= MAX_CRANK_TIME_MS)) {
@@ -483,14 +485,16 @@ void loop() {
       float volts2 = ads1.computeVolts(adc2);
       float volts3 = ads1.computeVolts(adc3);
 
-      oilPressure = (volts0 - 0.5) * (100.0 / 4.0);
+      // Calibrated for 48.0 PSI actual (from 89.9 PSI raw)
+      oilPressure = (volts0 - 0.5) * 13.348;
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
-      // Kohler NTC Temp Sender Inverse Calibration (High Voltage = Cold, Low Voltage = Hot)
-      currentWaterTemp = 240.0 - (volts1 * 49.0);
+      // Kohler NTC Temp Sender Inverse Calibration (37.0°F actual vs 39.3°F raw)
+      currentWaterTemp = (240.0 - (volts1 * 49.0)) - 2.3;
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
-      batteryVoltage = volts2 * 7.450;       // Calibrated for 13.70V actual multimeter reading
+      // Calibrated for 13.15V actual multimeter reading (from 17.5V raw)
+      batteryVoltage = volts2 * 5.598;
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
       // Cranking Voltage Sag & Battery Health Tracking
@@ -507,8 +511,9 @@ void loop() {
         battHealthStr = "WEAK";
       }
 
-      solar48v = volts3 * (49.7 / 2.7);       // 47k + 2.7k divider ratio (18.407 multiplier)
-      if (volts3 < 0.3) solar48v = 0.0;       // Noise filter for unconnected bench pin
+      // Calibrated for 51.0V actual multimeter reading (from 50.3V raw)
+      solar48v = volts3 * 18.663;
+      if (volts3 < 0.3) solar48v = 0.0; // Noise filter for unconnected bench pin
     }
 
     // --- C. READ ADS1115 ADC #2 (0x49) 16-BIT 5 PSI HYDROSTATIC FUEL TRANSDUCER & BURN RATE ---
@@ -520,7 +525,7 @@ void loop() {
       if (fuelVolts >= 0.4) {
         // Hydrostatic 16-Bit Fuel Percentage: 0.5V = 0% Empty, 4.5V = 100% Full
         fuelLevelPct = ((fuelVolts - 0.5) / 4.0) * 100.0;
-        if (fuelLevelPct < 0.0) fuelLevelPct = 0.0;
+        if (fuelLevelPct <= 1.5) fuelLevelPct = 0.0; // Empty tank threshold
         if (fuelLevelPct > 100.0) fuelLevelPct = 100.0;
       } else {
         fuelLevelPct = 0.0; // Sensor disconnected / empty
