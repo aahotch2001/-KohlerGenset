@@ -68,7 +68,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 110.0; // Dynamic default for active running block
+  if (digitalRead(pin) == HIGH) return 0.0; // Sensor not present
   delayMicroseconds(430);
 
   // Write 0xCC (Skip ROM) & 0x44 (Convert T)
@@ -90,8 +90,8 @@ float readDS18B20TempF() {
     }
   }
 
-  // Delay for conversion
-  delay(10);
+  // DS18B20 12-Bit Temperature Conversion Delay (750ms required by Dallas/Maxim datasheet!)
+  delay(750);
 
   // Reset & Read Scratchpad (0xCC, 0xBE)
   pinMode(pin, OUTPUT);
@@ -99,7 +99,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 110.0;
+  if (digitalRead(pin) == HIGH) return 0.0;
   delayMicroseconds(430);
 
   uint8_t rcmds[2] = {0xCC, 0xBE};
@@ -135,7 +135,7 @@ float readDS18B20TempF() {
   }
 
   float tempC = (int16_t)tempRaw * 0.0625;
-  if (tempC < -55.0 || tempC > 125.0) return 110.0;
+  if (tempC < -55.0 || tempC > 125.0) return 0.0;
 
   float rawF = (tempC * 9.0 / 5.0) + 32.0;
   return rawF;
@@ -213,8 +213,8 @@ float currentBurnRateGph = 0.0;
 float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
-float currentWaterTemp = 140.0;
-float currentBlockTemp = 110.0;
+float currentWaterTemp = 70.0;
+float currentBlockTemp = 0.0;
 
 // Hydrostatic Real-Time Transducer Burn Rate Memory
 float prevFuelGallons = -1.0;
@@ -485,15 +485,15 @@ void loop() {
       float volts2 = ads1.computeVolts(adc2);
       float volts3 = ads1.computeVolts(adc3);
 
-      // Calibrated for 48.0 PSI actual (from 89.9 PSI raw)
-      oilPressure = (volts0 - 0.5) * 13.348;
+      // Calibrated for 45.0 PSI actual (from 48.0 PSI raw)
+      oilPressure = (volts0 - 0.5) * 12.513;
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
       // Kohler NTC Temp Sender Inverse Calibration (140°F actual when running)
-      currentWaterTemp = 240.0 - (volts1 * 91.0);
+      currentWaterTemp = 240.0 - (volts1 * 48.0);
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
-      // Calibrated for 13.15V actual multimeter reading (from 17.5V raw)
+      // Calibrated for 13.15V actual multimeter reading
       batteryVoltage = volts2 * 5.598;
       if (volts2 < 0.3) batteryVoltage = 0.0; // Noise filter for unconnected bench pin
 
@@ -511,7 +511,7 @@ void loop() {
         battHealthStr = "WEAK";
       }
 
-      // Calibrated for 51.0V actual multimeter reading (from 50.3V raw)
+      // Calibrated for 51.0V actual multimeter reading
       solar48v = volts3 * 18.663;
       if (volts3 < 0.3) solar48v = 0.0; // Noise filter for unconnected bench pin
     }
