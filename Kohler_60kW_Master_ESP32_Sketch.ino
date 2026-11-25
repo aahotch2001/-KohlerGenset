@@ -523,9 +523,9 @@ void loop() {
       int16_t fuelAdc = ads2.readADC_SingleEnded(0); // 2nd ADS1115 Pin A0 (0.5V - 4.5V Direct Input!)
       float fuelVolts = ads2.computeVolts(fuelAdc);
 
-      if (fuelVolts >= 0.4) {
-        // Hydrostatic 16-Bit Fuel Percentage: 0.5V = 0% Empty, 4.5V = 100% Full
-        fuelLevelPct = ((fuelVolts - 0.5) / 4.0) * 100.0;
+      if (fuelVolts >= 0.45) {
+        // Calibrated 500-Gallon Hydrostatic Scale (1.40V max span for 3-4ft tank depth)
+        fuelLevelPct = ((fuelVolts - 0.5) / 1.40) * 100.0;
         if (fuelLevelPct <= 1.5) fuelLevelPct = 0.0; // Empty tank threshold
         if (fuelLevelPct > 100.0) fuelLevelPct = 100.0;
       } else {
