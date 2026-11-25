@@ -1345,7 +1345,7 @@ class GensetMqttService : Service() {
 
         val cleanHost = host.trim().removePrefix("tcp://").removePrefix("http://").substringBefore(":")
         val hostsToTry = mutableListOf<String>()
-        if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
+        if (cleanHost.isNotEmpty() && cleanHost != "100.98.23.73") hostsToTry.add(cleanHost)
         if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
         if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
 
@@ -1412,14 +1412,16 @@ class GensetMqttService : Service() {
                     })
 
                     client.connect(opts)
-                    mqttClient = client
-                    isConnected = true
+                    if (client.isConnected) {
+                        mqttClient = client
+                        isConnected = true
 
-                    val topics = arrayOf(
-                        "kohler/generator-status"
-                    )
-                    client.subscribe(topics)
-                    break
+                        val topics = arrayOf(
+                            "kohler/generator-status"
+                        )
+                        client.subscribe(topics)
+                        break
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
