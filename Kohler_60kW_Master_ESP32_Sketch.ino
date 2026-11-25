@@ -27,7 +27,7 @@ const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 #define RELAY_ON  LOW
 #define RELAY_OFF HIGH
 
-// PRODUCTION MODE: EG4 18kPV Inverter Auto-Start ENABLED!
+// PRODUCTION MODE: EG4 18kPV Inverter Passive Auto-Start Sense ENABLED!
 #define ENABLE_EG4_INVERTER_AUTOSTART true
 
 // =================================================================
@@ -42,7 +42,7 @@ const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 #define DS18B20_TEMP_PIN    25 // GPIO 25 -> DS18B20 3-Wire Digital Temp Sensor (Pin D25)
 
 #define OPT_RPM_SENSE_PIN   18 // GPIO 18 -> PC817 Ch1 Output (Alternator Terminal W RPM - Pin D18)
-#define OPT_18KPV_PIN       19 // GPIO 19 -> PC817 Ch2 Output (EG4 Inverter Auto-Start - Pin D19)
+#define OPT_18KPV_PIN       19 // GPIO 19 -> PC817 Ch2 Output (EG4 Inverter Auto-Start Sense - Pin D19)
 
 // W5500 SPI Ethernet Module Pins:
 #define W5500_SCLK_PIN 14 // Pin D14 (GPIO 14 - SPI Clock)
@@ -462,15 +462,10 @@ void loop() {
       currentStatusStr = "STOPPED";
     }
 
-    // PRODUCTION MODE: EG4 18kPV Inverter Auto-Start
-    if (ENABLE_EG4_INVERTER_AUTOSTART && optInverterStart && !isGeneratorRunning) {
-      digitalWrite(RELAY_START_PIN, RELAY_ON);
-      crankStartTimeMs = now;
+    // PASSIVE INVERTER AUTO-START SENSING (Inverter closes Kohler Terminals 3 & 4 directly!)
+    if (ENABLE_EG4_INVERTER_AUTOSTART && optInverterStart) {
       runSource = "EG4 18kPV Auto-Start";
-      Serial.println("PRODUCTION EVENT: EG4 18kPV Inverter requested generator start!");
-    } else if (ENABLE_EG4_INVERTER_AUTOSTART && !optInverterStart && startRelayEngaged && runSource == "EG4 18kPV Auto-Start") {
-      digitalWrite(RELAY_START_PIN, RELAY_OFF); // Inverter opened dry contact ➔ Stop generator!
-      Serial.println("PRODUCTION EVENT: EG4 18kPV Inverter stopped generator request!");
+      // The inverter is physically starting Kohler terminals 3 & 4 directly — ESP32 senses & tracks telemetry passively!
     }
 
     // --- B. READ ADS1115 ADC #1 (0x48) ENGINE SENSORS & VOLTAGES ---
