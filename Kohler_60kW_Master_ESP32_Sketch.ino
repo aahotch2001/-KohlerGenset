@@ -68,7 +68,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 0.0; // Sensor not present
+  if (digitalRead(pin) == HIGH) return 0.0;
   delayMicroseconds(430);
 
   // Write 0xCC (Skip ROM) & 0x44 (Convert T)
@@ -90,8 +90,7 @@ float readDS18B20TempF() {
     }
   }
 
-  // DS18B20 12-Bit Temperature Conversion Delay (750ms required by Dallas/Maxim datasheet!)
-  delay(750);
+  delay(750); // 750ms 12-bit conversion delay
 
   // Reset & Read Scratchpad (0xCC, 0xBE)
   pinMode(pin, OUTPUT);
@@ -135,7 +134,7 @@ float readDS18B20TempF() {
   }
 
   float tempC = (int16_t)tempRaw * 0.0625;
-  if (tempC < -55.0 || tempC > 125.0) return 0.0;
+  if (tempC <= 0.0 || tempC > 125.0) return 0.0;
 
   float rawF = (tempC * 9.0 / 5.0) + 32.0;
   return rawF;
@@ -214,8 +213,8 @@ float currentBurnRateGph = 0.0;
 float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
-float currentWaterTemp = 140.0;
-float currentBlockTemp = 110.0;
+float currentWaterTemp = 70.0;
+float currentBlockTemp = 0.0;
 
 // Hydrostatic Real-Time Transducer Burn Rate Memory
 float prevFuelGallons = -1.0;
@@ -431,7 +430,13 @@ void loop() {
 
     // --- A. READ OPTOCOUPLERS & DS18B20 DIGITAL TEMP SENSOR ---
     bool optInverterStart = (digitalRead(OPT_18KPV_PIN) == LOW);
-    currentBlockTemp = readDS18B20TempF(); // Read 3-wire digital thermometer on GPIO 25
+    float ds18b20Read = readDS18B20TempF();
+    if (ds18b20Read > 5.0) {
+      currentBlockTemp = ds18b20Read; // Read 3-wire digital thermometer on GPIO 25
+    } else {
+      // Fallback: If 1-wire digital sensor is disconnected, interpolate from water temp
+      currentBlockTemp = (currentWaterTemp > 30.0) ? (currentWaterTemp - 25.0) : 37.0;
+    }
 
     // Calculate RPM & Frequency from Hardware Interrupt
     noInterrupts();
@@ -439,8 +444,8 @@ void loop() {
     rpmPulseCount = 0;
     interrupts();
 
-    // Calibrated divisor = 47 for exact 1758 RPM / 58.6 Hz actual (from 3630 RPM / 121 Hz raw)
-    currentRpm = (pulses * 60) / 47;
+    // Calibrated divisor = 31 for exact 1758 RPM / 58.6 Hz actual (from 3630 RPM / 121 Hz raw)
+    currentRpm = (pulses * 60) / 31;
 
     // 15-SECOND OVER-CRANK SAFETY PROTECTION
     if (startRelayEngaged && (currentRpm <= 400) && (now - crankStartTimeMs >= MAX_CRANK_TIME_MS)) {
@@ -493,8 +498,8 @@ void loop() {
       oilPressure = (volts0 - 0.5) * 12.513;
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
-      // Kohler NTC Temp Sender Inverse Calibration (140°F actual when running)
-      currentWaterTemp = 240.0 - (volts1 * 48.0);
+      // Kohler NTC Temp Sender Two-Point Curve (37°F at 4.08V cold ➔ 140°F at 2.10V running!)
+      currentWaterTemp = 249.24 - (volts1 * 52.02);
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
       // Calibrated for 13.15V actual multimeter reading
