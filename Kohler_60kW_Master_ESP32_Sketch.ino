@@ -27,8 +27,8 @@ const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 #define RELAY_ON  LOW
 #define RELAY_OFF HIGH
 
-// Set to true when EG4 18kPV inverter wire is attached to GPIO 19 (set false for bench testing)
-#define ENABLE_EG4_INVERTER_AUTOSTART false
+// PRODUCTION MODE: EG4 18kPV Inverter Auto-Start ENABLED!
+#define ENABLE_EG4_INVERTER_AUTOSTART true
 
 // =================================================================
 // 2. ELEGOO ESP-32 HARDWARE PIN DEFINITIONS (USER BREAKOUT BOARD)
@@ -462,11 +462,15 @@ void loop() {
       currentStatusStr = "STOPPED";
     }
 
-    // Handle Auto-Start from EG4 18kPV Inverter
+    // PRODUCTION MODE: EG4 18kPV Inverter Auto-Start
     if (ENABLE_EG4_INVERTER_AUTOSTART && optInverterStart && !isGeneratorRunning) {
       digitalWrite(RELAY_START_PIN, RELAY_ON);
       crankStartTimeMs = now;
       runSource = "EG4 18kPV Auto-Start";
+      Serial.println("PRODUCTION EVENT: EG4 18kPV Inverter requested generator start!");
+    } else if (ENABLE_EG4_INVERTER_AUTOSTART && !optInverterStart && startRelayEngaged && runSource == "EG4 18kPV Auto-Start") {
+      digitalWrite(RELAY_START_PIN, RELAY_OFF); // Inverter opened dry contact ➔ Stop generator!
+      Serial.println("PRODUCTION EVENT: EG4 18kPV Inverter stopped generator request!");
     }
 
     // --- B. READ ADS1115 ADC #1 (0x48) ENGINE SENSORS & VOLTAGES ---
