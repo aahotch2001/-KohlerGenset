@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kohler 60kW Genset — Control & Service Portal</title>
+    <title>Kohler 60kW Genset — Master Operating Guide & System Portal</title>
     <style>
         :root {
             --bg-color: #0d0d0d;
             --card-bg: #1e1e1e;
             --accent-green: #4CAF50;
             --accent-amber: #FF9800;
+            --accent-blue: #2196F3;
+            --accent-red: #FF5252;
             --text-main: #ffffff;
             --text-sub: #b0b0b0;
             --border-color: #333333;
@@ -26,19 +28,19 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 700px;
             width: 100%;
         }
 
         .header {
             text-align: center;
             padding: 20px 0;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--accent-green);
             margin-bottom: 24px;
         }
 
         .header h1 {
-            font-size: 24px;
+            font-size: 26px;
             margin: 0 0 8px 0;
             color: var(--text-main);
         }
@@ -56,13 +58,13 @@
             background-color: #1b3b22;
             color: #ffffff;
             border: 2px solid var(--accent-green);
-            padding: 16px;
+            padding: 18px;
             border-radius: 12px;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: bold;
             text-decoration: none;
             margin-bottom: 24px;
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
             transition: transform 0.2s;
         }
 
@@ -74,7 +76,7 @@
             background-color: var(--card-bg);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             border: 1px solid var(--border-color);
         }
 
@@ -83,7 +85,27 @@
             margin-top: 0;
             color: var(--accent-green);
             border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h3 {
+            font-size: 15px;
+            color: var(--accent-amber);
+            margin: 16px 0 8px 0;
+        }
+
+        p, li {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #d0d0d0;
+        }
+
+        ul {
+            padding-left: 20px;
+            margin: 8px 0;
         }
 
         table {
@@ -94,7 +116,7 @@
         }
 
         th, td {
-            padding: 8px 10px;
+            padding: 10px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
@@ -102,6 +124,7 @@
         th {
             color: var(--text-sub);
             font-weight: 600;
+            background-color: #141414;
         }
 
         code {
@@ -112,9 +135,45 @@
             color: #ffcc80;
         }
 
+        .badge-green {
+            background-color: #1b3b22;
+            color: #4CAF50;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .badge-red {
+            background-color: #5c2323;
+            color: #ff5252;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .badge-orange {
+            background-color: #3e2723;
+            color: #ff9800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .badge-blue {
+            background-color: #0d324d;
+            color: #2196f3;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
         .diagram {
             background-color: #121212;
-            padding: 12px;
+            padding: 14px;
             border-radius: 8px;
             font-family: monospace;
             font-size: 12px;
@@ -122,13 +181,14 @@
             overflow-x: auto;
             color: #81c784;
             border: 1px solid #2a2a2a;
+            line-height: 1.5;
         }
 
         .footer {
             text-align: center;
             font-size: 12px;
             color: var(--text-sub);
-            margin-top: 30px;
+            margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
         }
@@ -139,7 +199,7 @@
 <div class="container">
     <div class="header">
         <h1>⚙️ Kohler 60kW Genset</h1>
-        <p>Remote Control, Telemetry & Service Portal</p>
+        <p>Master Operating Guide, Hardware Map & Service Portal</p>
     </div>
 
     <!-- APK DOWNLOAD BUTTON -->
@@ -147,114 +207,147 @@
         📱 Download Phone Control App (.apk)
     </a>
 
-    <!-- SYSTEM OVERVIEW CARD -->
+    <!-- 1. SYSTEM OVERVIEW -->
     <div class="card">
-        <h2>🌐 Network & Broker Details</h2>
-        <table>
-            <tr>
-                <th>Setting</th>
-                <th>Value</th>
-            </tr>
-            <tr>
-                <td>Mosquitto Local IP</td>
-                <td><code>192.168.68.91:1883</code></td>
-            </tr>
-            <tr>
-                <td>Tailscale 5G IP</td>
-                <td><code>100.108.173.127:1883</code></td>
-            </tr>
-            <tr>
-                <td>MQTT Login</td>
-                <td><code>aahotch2001</code> / <code>aaronjulie</code></td>
-            </tr>
-        </table>
-    </div>
+        <h2>🧠 1. System Overview & Standalone Operation</h2>
+        <p>This controller manages a <b>Kohler 60kW Diesel Generator</b> driven by a <b>John Deere 4045T 4.5L Turbo Diesel Engine</b> (converted for 120/240V Single-Phase Double-Delta residential operation).</p>
+        <p><b>24/7 Standalone Autonomy:</b> The ELEGOO ESP32 controller mounted inside the generator cabinet runs <b>100% autonomously 24/7/365</b>. It executes block heater thermostat protection, 12V battery charging, and safety monitoring with <u>zero dependency on your phone or PC being turned on</u>.</p>
 
-    <!-- HARDWARE PINOUT CARD -->
-    <div class="card">
-        <h2>⚡ ESP32 Hardware Pinout</h2>
-        <table>
-            <tr>
-                <th>Feature</th>
-                <th>Pin</th>
-                <th>Function</th>
-            </tr>
-            <tr>
-                <td>Start Relay</td>
-                <td><code>IO4</code> / <code>D4</code></td>
-                <td>Songle Relay IN1 (Kohler Terminals 3 & 4)</td>
-            </tr>
-            <tr>
-                <td>Coolant Heater Relay</td>
-                <td><code>IO2</code> / <code>D2</code></td>
-                <td>Songle Relay IN2 (+5V to SSR-40DA)</td>
-            </tr>
-            <tr>
-                <td>Alternator RPM Sense</td>
-                <td><code>RXD</code> / <code>D5</code></td>
-                <td>PC817 Ch1 Output (Alternator Terminal W)</td>
-            </tr>
-            <tr>
-                <td>Inverter Auto-Start</td>
-                <td><code>IO36</code> / <code>D18</code></td>
-                <td>PC817 Ch2 Output (EG4 18kPV)</td>
-            </tr>
-            <tr>
-                <td>I2C SDA (ADC)</td>
-                <td><code>IO14</code> / <code>D21</code></td>
-                <td>ADS1115 ADC Data Line</td>
-            </tr>
-            <tr>
-                <td>I2C SCL (ADC)</td>
-                <td><code>IO15</code> / <code>D22</code></td>
-                <td>ADS1115 ADC Clock Line</td>
-            </tr>
-            <tr>
-                <td>Digital Temp Sensor</td>
-                <td><code>D25</code> (GPIO 25)</td>
-                <td>DS18B20 3-Wire Temp (4.7k Ω pull-up to 3.3V)</td>
-            </tr>
-        </table>
-    </div>
-
-    <!-- VISUAL SCHEMATIC CARD -->
-    <div class="card">
-        <h2>🎨 Visual Master Wiring Schematic</h2>
-        <img src="Kohler_Genset_Master_Wiring_Diagram.svg" alt="Kohler Genset Visual Wiring Schematic" style="width: 100%; border-radius: 8px; border: 1px solid #333;">
-    </div>
-
-    <!-- EDA PROFESSIONAL SCHEMATIC CARD -->
-    <div class="card">
-        <h2>🔬 EDA Professional Circuit Schematic (KiCad / EasyEDA Style)</h2>
-        <img src="Kohler_Genset_EDA_Visual_Schematic.svg" alt="Kohler Genset EDA Circuit Schematic" style="width: 100%; border-radius: 8px; border: 1px solid #333; background-color: #fdfdfd;">
-    </div>
-
-    <!-- SENSOR CALIBRATION CARD -->
-    <div class="card">
-        <h2>🧮 Sensor Calibration Formulas</h2>
-        <div class="diagram">
-12V Battery:     volts2 * 6.047 (10k / 2.2k divider)
-48V Solar Bank:  volts3 * (46.7 / 2.7) (44k / 2.7k divider)
-Water Temp:      240.0 - (volts1 * 49.0) (Inverse Kohler NTC)
-Oil Pressure:    (volts0 - 0.5) * (100.0 / 4.0)
-Alternator W:    1k Ω series resistor + 1N4007 protection diode
-        </div>
-    </div>
-
-    <!-- OPERATING RULES CARD -->
-    <div class="card">
-        <h2>🛡️ Safety & Operating Rules</h2>
+        <h3>🌐 Networking & Hardwired Connection</h3>
         <ul>
-            <li><b>START:</b> Relays engage ➔ Status shows <code>CRANKING</code> ➔ Terminal W confirms <code>RPM > 400</code> ➔ Status turns to <code>RUNNING</code>.</li>
-            <li><b>STOP:</b> Relay disengages immediately ➔ Engine runs down Kohler internal cooldown (<code>COOLDOWN</code>) ➔ <code>RPM == 0</code> ➔ Status turns to <code>STOPPED</code>.</li>
-            <li><b>15s Over-crank Safety:</b> If starter cranks >15 seconds without engine firing, relay automatically disengages.</li>
-            <li><b>Smart Victron 12V Charger:</b> Turns ON when 12V Starter Battery drops below <code>12.3V</code>, and turns OFF when charged to <code>13.8V</code> (0mA 48V standby drain).</li>
+            <li><b>Hardwired Cat6 Ethernet:</b> Connects via W5500 SPI Ethernet module directly to the Solar Room network switch (100 Mbps, 0% packet loss through double steel enclosure).</li>
+            <li><b>Local Mosquitto Broker:</b> <code>192.168.68.91:1883</code></li>
+            <li><b>Tailscale 5G Remote IP:</b> <code>100.108.173.127:1883</code></li>
+            <li><b>Direct ESP32 IP:</b> <code>192.168.68.199:1883</code></li>
         </ul>
     </div>
 
+    <!-- 2. HARDWARE PINOUT MAP -->
+    <div class="card">
+        <h2>📌 2. ELEGOO ESP32 Breakout Board Terminal Map</h2>
+        <table>
+            <tr>
+                <th>Breakout Terminal</th>
+                <th>Wire Color</th>
+                <th>Hardware Destination & Function</th>
+            </tr>
+            <tr>
+                <td><code>D26</code></td>
+                <td><b>[BLUE]</b></td>
+                <td>Songle Relay 1 IN1 (Crank/Start Command ➔ Kohler Terminals 3 & 4)</td>
+            </tr>
+            <tr>
+                <td><code>D27</code></td>
+                <td><b>[BLUE]</b></td>
+                <td>Songle Relay 2 IN2 (120V Block Heater / Circulation Pump)</td>
+            </tr>
+            <tr>
+                <td><code>D4</code></td>
+                <td><b>[BLUE]</b></td>
+                <td>Victron Orion 48V-to-12V Charger Remote Pin <code>H</code> (Direct 3.3V Control)</td>
+            </tr>
+            <tr>
+                <td><code>D18</code></td>
+                <td><b>[BLUE]</b></td>
+                <td>PC817 Optocoupler Ch1 Output <code>O1</code> (Alternator Terminal W RPM & Hz)</td>
+            </tr>
+            <tr>
+                <td><code>D19</code></td>
+                <td><b>[BLUE]</b></td>
+                <td>PC817 Optocoupler Ch2 Output <code>O2</code> (EG4 18kPV Inverter Auto-Start)</td>
+            </tr>
+            <tr>
+                <td><code>D25</code></td>
+                <td><b>[YELLOW]</b></td>
+                <td>DS18B20 3-Wire Digital Temp Data Wire (+ 4.7k Ω resistor to 3.3V)</td>
+            </tr>
+            <tr>
+                <td><code>D21</code></td>
+                <td><b>[GREEN]</b></td>
+                <td>Dual ADS1115 ADC Modules Pin <code>SDA</code> (I2C Data)</td>
+            </tr>
+            <tr>
+                <td><code>D22</code></td>
+                <td><b>[WHITE]</b></td>
+                <td>Dual ADS1115 ADC Modules Pin <code>SCL</code> (I2C Clock)</td>
+            </tr>
+            <tr>
+                <td><code>D14</code> / <code>D23</code> / <code>D12</code> / <code>D5</code></td>
+                <td><b>[SPI]</b></td>
+                <td>W5500 SPI Ethernet Module (SCLK, MOSI, MISO, CS)</td>
+            </tr>
+            <tr>
+                <td><code>VIN</code> / <code>GND</code></td>
+                <td><b>[RED/BLACK]</b></td>
+                <td>DROK Buck Converter 5.0V DC Input & Common Ground Rail</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- 3. SENSOR CALIBRATIONS & DUAL ADS1115 -->
+    <div class="card">
+        <h2>🧮 3. Calibrated Sensor Formulas & Dual ADS1115 ADCs</h2>
+
+        <h3>ADS1115 Module #1 (I2C Address 0x48 - ADDR Pin to GND):</h3>
+        <div class="diagram">
+A0 (Oil Pressure Sender Terminal S):  Blue Wire via 10k/22k divider + 0.1uF capacitor
+  Formula: (volts0 - 0.5) * (100.0 / 4.0) [PSI]
+
+A1 (Water Temp Sender Terminal S):   Purple Wire via 10k/22k divider + 0.1uF capacitor
+  Formula: 240.0 - (volts1 * 49.0) [Inverse Kohler NTC: Cold=40°F, Warm=129°F]
+
+A2 (12V Starter Battery Voltage):    Green/Yellow Wire via 10k/2.2k divider
+  Formula: volts2 * 7.450 [Calibrated for 13.70V actual multimeter reading]
+
+A3 (48V Solar Battery Bank):         Black/Orange Wire via single 47k/2.7k divider
+  Formula: volts3 * 18.407 [Calibrated for 49.7k/2.7k divider]
+        </div>
+
+        <h3>ADS1115 Module #2 (I2C Address 0x49 - ADDR Pin to 3V3):</h3>
+        <div class="diagram">
+A0 (5 PSI Hydrostatic Fuel Level Transducer): Yellow Wire (0.5V-4.5V Direct Input - 0 Resistors!)
+  Formula: ((fuelVolts - 0.5) / 4.0) * 100.0 [% Tank Level]
+  Real-Time Burn Rate: Calculates 1-minute rolling GPH from hydrostatic pressure drop.
+        </div>
+    </div>
+
+    <!-- 4. OPERATING RULES & SAFETY PROTECTION -->
+    <div class="card">
+        <h2>🛡️ 4. Control Rules & Failsafe Protections</h2>
+        <ul>
+            <li><b>15-Second Over-Crank Safety:</b> If starter cranks > 15 seconds without Alternator Terminal W detecting <code>RPM > 400</code>, the ESP32 disengages Relay 1 to prevent starter burnout.</li>
+            <li><b>120V Coolant Block Heater Thermostat:</b> Driven by 3-wire digital thermometer on Pin <code>D25</code>. Turns ON Relay 2 when block temp drops &le; <b>38°F</b>, and turns OFF at <b>50°F</b> (max 120m limit).</li>
+            <li><b>Victron 48V-to-12V Smart Charger:</b> Direct 3.3V control on Pin <code>D4</code> to Victron Remote Pin <code>H</code>. Turns ON when 12V battery &le; <b>12.2V DC</b>, and turns OFF at <b>13.8V DC</b> (0mA 48V standby power drain!).</li>
+            <li><b>Smart 12V Battery Health Rating:</b> Measures 500A cranking voltage sag ($V_{\text{min}}$) ➔ Rates battery <span class="badge-green">HEALTHY</span> (&ge;10V), <span class="badge-orange">FAIR</span> (9V-10V), or <span class="badge-red">WEAK</span> (&lt;9V).</li>
+            <li><b>Smart Adaptive Telemetry Rate:</b> 10-second interval when stopped (99% packet/battery saver < 0.1%/day) ➔ 1-second interval when running/cranking.</li>
+        </ul>
+    </div>
+
+    <!-- 5. VISUAL SCHEMATIC DIAGRAMS -->
+    <div class="card">
+        <h2>🎨 5. Visual Master Wiring Diagrams</h2>
+        <h3>Color-Coded Hardware Connection Diagram:</h3>
+        <img src="Kohler_Genset_Master_Wiring_Diagram.svg" alt="Master Wiring Diagram" style="width:100%; border-radius:8px; border:1px solid #333; margin-bottom:16px;">
+
+        <h3>EDA KiCad-Style Electronic Circuit Schematic:</h3>
+        <img src="Kohler_Genset_EDA_Visual_Schematic.svg" alt="EDA Circuit Schematic" style="width:100%; border-radius:8px; border:1px solid #333; background-color:#fdfdfd;">
+    </div>
+
+    <!-- 6. PHONE APP USER GUIDE & INDICATOR LIGHTS -->
+    <div class="card">
+        <h2>📱 6. Phone App Top-Bar Indicator Lights Guide</h2>
+        <p>The top bar header features 3 real-time status indicator badges:</p>
+        <ul>
+            <li><span class="badge-green">CHARGER ON</span> / <span class="badge-red">CHARGER OFF</span> — Green when Victron 12V charger is active; Red when OFF (0mA standby).</li>
+            <li><span class="badge-orange">PUMP ON</span> / <span class="badge-blue">PUMP OFF</span> — Orange when circulation pump/heater is active; Blue when idle.</li>
+            <li><span class="badge-green">RUNNING</span> / <span class="badge-orange">CRANKING</span> / <span class="badge-orange">COOLDOWN</span> / <span>STOPPED</span> — Generator state <i>(Clickable anytime to re-connect!)</i>.</li>
+        </ul>
+        <p><b>Settings Dialog (⚙ Icon):</b> Adjust thermostat setpoints, Victron charger setpoints, toggle Push Notifications ON/OFF, or tap <b>VIEW LOGS ➔</b> to open the full-screen System Event Log Viewer!</p>
+    </div>
+
     <div class="footer">
-        Kohler 60kW Genset Master Control System &copy; 2026<br>
-        Hosted on GitHub Pages
+        Kohler 60kW Genset Master Remote Control &amp; Telemetry System &copy; 2026<br>
+        Hosted Live on GitHub Pages
     </div>
 </div>
 
