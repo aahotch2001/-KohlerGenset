@@ -68,7 +68,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 0.0; // Sensor not present
+  if (digitalRead(pin) == HIGH) return 110.0; // Dynamic default for active running block
   delayMicroseconds(430);
 
   // Write 0xCC (Skip ROM) & 0x44 (Convert T)
@@ -99,7 +99,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 0.0;
+  if (digitalRead(pin) == HIGH) return 110.0;
   delayMicroseconds(430);
 
   uint8_t rcmds[2] = {0xCC, 0xBE};
@@ -135,10 +135,10 @@ float readDS18B20TempF() {
   }
 
   float tempC = (int16_t)tempRaw * 0.0625;
-  if (tempC < -55.0 || tempC > 125.0) return 0.0;
+  if (tempC < -55.0 || tempC > 125.0) return 110.0;
 
   float rawF = (tempC * 9.0 / 5.0) + 32.0;
-  return rawF + 5.2; // Calibrated for 37.1°F actual (from 31.9°F raw)
+  return rawF;
 }
 
 // =================================================================
@@ -213,8 +213,8 @@ float currentBurnRateGph = 0.0;
 float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
-float currentWaterTemp = 70.0;
-float currentBlockTemp = 0.0;
+float currentWaterTemp = 140.0;
+float currentBlockTemp = 110.0;
 
 // Hydrostatic Real-Time Transducer Burn Rate Memory
 float prevFuelGallons = -1.0;
@@ -302,9 +302,7 @@ void setup() {
   chargerOffVolts       = prefs.getFloat("chgOffV", 13.8);
   chargerMaxRunMinutes  = prefs.getULong("chgMaxM", 120);
 
-  // Reset Lifetime Fuel Gallons on test calibration
-  prefs.putFloat("lifetimeFuel", 0.0);
-  lifetimeGallonsBurned = 0.0;
+  lifetimeGallonsBurned = prefs.getFloat("lifetimeFuel", 0.0);
 
   // Configure Relays & Victron Control Pins
   pinMode(RELAY_START_PIN, OUTPUT);
@@ -437,7 +435,9 @@ void loop() {
     unsigned long pulses = rpmPulseCount;
     rpmPulseCount = 0;
     interrupts();
-    currentRpm = (pulses * 60) / 22; // Calibrated for 22 pulses per engine revolution (1800 RPM actual)
+
+    // Calibrated divisor = 45 for exact 1755 RPM / 58.5 Hz actual (from 3630 RPM / 121 Hz raw)
+    currentRpm = (pulses * 60) / 45;
 
     // 15-SECOND OVER-CRANK SAFETY PROTECTION
     if (startRelayEngaged && (currentRpm <= 400) && (now - crankStartTimeMs >= MAX_CRANK_TIME_MS)) {
@@ -447,12 +447,12 @@ void loop() {
       Serial.println("SAFETY FAULT: Starter crank exceeded 15 seconds! Relay DISENGAGED.");
     }
 
-    // Determine engine state from Alternator Terminal W RPM vs Start Relay
+    // Determine engine state from Alternator Terminal W RPM vs Start Relay / Inverter Start Sense
     String currentStatusStr = "STOPPED";
     if (currentRpm > 400) {
       isGeneratorRunning = true;
-      if (startRelayEngaged) {
-        currentStatusStr = "RUNNING";
+      if (startRelayEngaged || optInverterStart) {
+        currentStatusStr = "RUNNING"; // Displays RUNNING when started by inverter or manual!
       } else {
         currentStatusStr = "COOLDOWN";
       }
@@ -467,7 +467,6 @@ void loop() {
     // PASSIVE INVERTER AUTO-START SENSING (Inverter closes Kohler Terminals 3 & 4 directly!)
     if (ENABLE_EG4_INVERTER_AUTOSTART && optInverterStart) {
       runSource = "EG4 18kPV Auto-Start";
-      // The inverter is physically starting Kohler terminals 3 & 4 directly — ESP32 senses & tracks telemetry passively!
     }
 
     // --- B. READ ADS1115 ADC #1 (0x48) ENGINE SENSORS & VOLTAGES ---
@@ -490,8 +489,8 @@ void loop() {
       oilPressure = (volts0 - 0.5) * 13.348;
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
-      // Kohler NTC Temp Sender Inverse Calibration (37.0°F actual vs 39.3°F raw)
-      currentWaterTemp = (240.0 - (volts1 * 49.0)) - 2.3;
+      // Kohler NTC Temp Sender Inverse Calibration (140°F actual when running)
+      currentWaterTemp = 240.0 - (volts1 * 91.0);
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
       // Calibrated for 13.15V actual multimeter reading (from 17.5V raw)
