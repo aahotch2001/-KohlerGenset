@@ -38,7 +38,7 @@ const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 
 #define RELAY_START_PIN     26 // GPIO 26 -> Songle Relay IN1 (Kohler Terminals 3 & 4 - Pin D26)
 #define RELAY_HEATER_PIN    27 // GPIO 27 -> Songle Relay IN2 (120V Coolant Heater - Pin D27)
-#define VICTRON_CHARGER_PIN 4  // GPIO 4  -> Direct 3.3V Signal to Victron Remote Pin 'H' (Pin D4)
+#define VICTRON_CHARGER_PIN 13 // GPIO 13 -> Direct 3.3V Signal to Victron Remote Pin 'H' (Pin D13)
 #define DS18B20_TEMP_PIN    25 // GPIO 25 -> DS18B20 3-Wire Digital Temp Sensor (Pin D25)
 
 #define OPT_RPM_SENSE_PIN   18 // GPIO 18 -> PC817 Ch1 Output (Alternator Terminal W RPM - Pin D18)
@@ -49,6 +49,7 @@ const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 #define W5500_MISO_PIN 12 // Pin D12 (GPIO 12 - SPI MISO)
 #define W5500_MOSI_PIN 23 // Pin D23 (GPIO 23 - SPI MOSI)
 #define W5500_CS_PIN   5  // Pin D5  (GPIO 5  - SPI SCS/CS)
+#define W5500_RST_PIN  4  // Pin D4  (GPIO 4  - W5500 Hardware Reset Pin)
 
 // =================================================================
 // 3. HARDWARE INTERRUPT PULSE COUNTER & DS18B20 SENSOR READ
@@ -316,6 +317,13 @@ void setup() {
   pinMode(DS18B20_TEMP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
 
+  // Hardware Reset Pulse for W5500 SPI Ethernet Module on D4 (GPIO 4)
+  pinMode(W5500_RST_PIN, OUTPUT);
+  digitalWrite(W5500_RST_PIN, LOW);  // Hold W5500 in hardware reset
+  delay(50);
+  digitalWrite(W5500_RST_PIN, HIGH); // Release W5500 from reset
+  delay(50);
+
   // Initialize W5500 SPI Ethernet Module on Pins D14 (SCLK), D23 (MOSI), D12 (MISO), D5 (CS)
   pinMode(W5500_CS_PIN, OUTPUT);
   SPI.begin(W5500_SCLK_PIN, W5500_MISO_PIN, W5500_MOSI_PIN, W5500_CS_PIN);
@@ -327,10 +335,10 @@ void setup() {
   IPAddress subnet(255, 255, 255, 0);
   IPAddress dns(192, 168, 68, 1);
 
-  Serial.println("Initializing W5500 Hardwired Cat6 Ethernet...");
+  Serial.println("Initializing W5500 Hardwired Cat6 Ethernet (IP: 192.168.68.199)...");
   Ethernet.begin(mac, ip, dns, gateway, subnet);
 
-  if (Ethernet.hardwareStatus() == EthernetNoHardware || Ethernet.localIP() == IPAddress(0,0,0,0)) {
+  if (Ethernet.hardwareStatus() == EthernetNoHardware || Ethernet.localIP() == IPAddress(0, 0, 0, 0)) {
     Serial.println("W5500 Ethernet SPI inactive or searching. Enabling Wi-Fi backup ('Hotchkin')...");
     w5500Present = false;
     client.setClient(wifiClient);
@@ -595,7 +603,7 @@ void loop() {
       autoChargerOn = false;
     }
 
-    // Drive Victron Remote Pin 'H' Output (GPIO 4)
+    // Drive Victron Remote Pin 'H' Output (GPIO 13)
     bool finalChargerState = manualChargerOn || autoChargerOn;
     digitalWrite(VICTRON_CHARGER_PIN, finalChargerState ? HIGH : LOW);
 

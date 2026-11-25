@@ -1,0 +1,117 @@
+================================================================================
+     KOHLER 60kW GENSET + ELEGOO ESP-32 BREAKOUT ADAPTER MASTER WIRING BLUEPRINT
+================================================================================
+
+--------------------------------------------------------------------------------
+1. WIRE COLOR CODE CONVENTION
+--------------------------------------------------------------------------------
+[RED]          = +5V DC Regulated Power (or +3.3V DC Sensor VCC)
+[BLACK]        = Common Ground (GND - All grounds tied together)
+[DARK RED]     = +12V DC Battery Power (Fused 5A)
+[ORANGE]       = +48V DC Solar Battery Positive Line
+[YELLOW]       = Analog & Digital Sensor Signals (Oil, Temp, Fuel, Battery Sense)
+[BLUE]         = Relay & Optocoupler Digital Control Signals
+[GREEN]        = I2C Data Line (SDA)
+[WHITE]        = I2C Clock Line (SCL)
+[RJ45]         = Hardwired Ethernet Cable to Router/Switch
+
+--------------------------------------------------------------------------------
+2. POWER SUPPLY & DISTRIBUTION BLOCK
+--------------------------------------------------------------------------------
+A. DROK LM2596 Buck Converter (Set output to EXACTLY 5.0V DC):
+   - IN+  <-- [DARK RED] 12V Battery (+) via [5A Inline Fuse] from Generator Starter Battery
+   - IN-  <-- [BLACK] 12V Battery (-) Ground from Generator Starter Battery
+   - OUT+ --> [RED] 5.0V Output to [Soldered 5V Power Bus Rail]
+   - OUT- --> [BLACK] Ground Output to [Soldered Common Ground Bus Rail]
+
+B. Soldered Power Bus Rail Connections:
+   - Soldered 5V Bus Rail (Red): Supplies 5V Power to ELEGOO ESP32 VIN, ADS1115 #1 & #2, Relays.
+   - Soldered GND Bus Rail (Black): Connects ALL Grounds together (ESP32, Sensors, Inverter, Kohler Panel).
+
+--------------------------------------------------------------------------------
+3. ELEGOO ESP-32 USB-C BREAKOUT ADAPTER BOARD PHYSICAL PINOUT
+--------------------------------------------------------------------------------
+Power & Ground Connections:
+   - Terminal [VIN]    (Left Row 1st)  <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Terminal [GND]    (Left / Right)  <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+   - Terminal [3V3]    (Right Row 1st) --> [RED] Wire to DS18B20 Temp VCC & ADS1115 #2 ADDR Pin
+
+I2C Bus (Dual ADS1115 ADC Modules):
+   - Terminal [D21]    (Right Row 11th down) --> [GREEN] Wire to ADS1115 #1 & #2 Pin [SDA]
+   - Terminal [D22]    (Right Row 14th down) --> [WHITE] Wire to ADS1115 #1 & #2 Pin [SCL]
+
+Optocoupler Inputs (PC817 Board Outputs - Pure Ground Switching, NO VCC Wire!):
+   - PC817 Output [O1] (Ch1): [BLUE] Wire to ELEGOO Terminal [D18] (Alternator Terminal 'W' RPM)
+   - PC817 Output [O2] (Ch2): [BLUE] Wire to ELEGOO Terminal [D19] (EG4 18kPV Auto-Start Signal)
+   - PC817 Ground [GND]:      [BLACK] Wire to [Soldered Common Ground Bus Rail]
+
+Relay & Charger Control Outputs:
+   - Terminal [D26]    (Left Row 7th down)   --> [BLUE] Wire to Songle Relay 1 [IN1] (Start Command -> Terminals 3 & 4)
+   - Terminal [D27]    (Left Row 6th down)   --> [BLUE] Wire to Songle Relay 2 [IN2] (120V Coolant Heater Control)
+   - Terminal [D4]     (Right Row 5th down)  --> [BLUE] Wire to Victron Orion Remote Pin [H] (Direct 3.3V Control)
+
+Sensors & W5500 SPI Ethernet Module:
+   - Terminal [D25]    (Left Row 8th down)   --> [YELLOW] Wire to DS18B20 3-Wire Temp Data (+ 4.7k Ω resistor to 3.3V)
+   - Terminal [D14]    (Left Row 5th down)   --> W5500 SPI Ethernet Module [SCLK] (Clock Line)
+   - Terminal [D23]    (Right Row 15th down) --> W5500 SPI Ethernet Module [MOSI] (Data Out Line)
+   - Terminal [D5]     (Right Row 8th down)  --> W5500 SPI Ethernet Module [SCS / CS] (Chip Select Line)
+
+--------------------------------------------------------------------------------
+4. DUAL ADS1115 16-BIT PRECISION ADC MODULES SCHEMATIC
+--------------------------------------------------------------------------------
+ADS1115 Module #1 (I2C Address 0x48 - ADDR Pin to GND):
+   - Pin [VDD]      <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Pin [GND]      <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+   - Pin [SDA]      <-- [GREEN] Wire from ELEGOO ESP32 Terminal [D21]
+   - Pin [SCL]      <-- [WHITE] Wire from ELEGOO ESP32 Terminal [D22]
+   - Pin [ADDR]     <-- [BLACK] Wire to [Soldered Common Ground Bus Rail] (Sets Address 0x48)
+
+   Analog Channels & Verified Physical Wire Colors:
+   - Pin [A0] (Oil Pressure Gauge Terminal 'S'):
+     <-- [BLUE] Wire tapped from Kohler Panel Oil Sender Terminal [S] via [10k Ohm Resistor]
+     * [22k Ohm Resistor] from Pin A0 to [Soldered Common Ground Bus Rail]
+     * [0.1uF / 104 Ceramic Capacitor] between A0 and GND for noise filtering.
+
+   - Pin [A1] (Water Temp Gauge Terminal 'S'):
+     <-- [PURPLE] Wire tapped from Kohler Panel Temp Sender Terminal [S] via [10k Ohm Resistor]
+     * [22k Ohm Resistor] from Pin A1 to [Soldered Common Ground Bus Rail]
+     * [0.1uF / 104 Ceramic Capacitor] between A1 and GND for noise filtering.
+
+   - Pin [A2] (12V Starter Battery Voltage Sense):
+     <-- [GREEN/YELLOW STRIPED] Wire from 12V Battery (+) via Voltage Divider:
+     * 10k Ohm Resistor from 12V(+) line to Pin A2
+     * 2.2k Ohm Resistor from Pin A2 to [Soldered Common Ground Bus Rail]
+     * Calibrated Multiplier: 7.450 (Reads 13.70V accurately)
+
+   - Pin [A3] (48V Solar Battery Bank Voltage Sense):
+     <-- [BLACK/ORANGE STRIPED] Wire from 48V Solar Battery Bank (+) via Voltage Divider:
+     * 47k Ohm Resistor from 48V(+) line to Pin A3
+     * 2.7k Ohm Resistor from Pin A3 to [Soldered Common Ground Bus Rail]
+     * Calibrated Multiplier: 18.407 (49.7 / 2.7)
+
+ADS1115 Module #2 (I2C Address 0x49 - ADDR Pin to 3V3):
+   - Pin [VDD]      <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Pin [GND]      <-- [BLACK] Wire from [Soldered Common Ground Bus Rail]
+   - Pin [SDA]      <-- [GREEN] Wire from ELEGOO ESP32 Terminal [D21] (Daisy-chained)
+   - Pin [SCL]      <-- [WHITE] Wire from ELEGOO ESP32 Terminal [D22] (Daisy-chained)
+   - Pin [ADDR]     <-- [RED] Wire to ELEGOO Terminal [3V3] (Sets Address 0x49)
+
+   Analog Channel:
+   - Pin [A0] (5 PSI Hydrostatic Fuel Level Transducer):
+     <-- [YELLOW] Wire from 5 PSI 0.5V-4.5V Fuel Transducer (DIRECT INPUT - ZERO RESISTORS NEEDED!)
+
+--------------------------------------------------------------------------------
+5. KOHLER PANEL GAUGES, RELAYS & VICTRON CHARGER CONNECTIONS
+--------------------------------------------------------------------------------
+Songle Relay 1 (Kohler Crank / Remote Start Circuit):
+   - Terminal [IN1] <-- [BLUE] Wire from ELEGOO ESP32 Terminal [D26]
+   - Contacts [COM] & [NO] --> Connect across Kohler Panel Terminals [3] & [4]
+
+Songle Relay 2 (120V Coolant Block Heater Control):
+   - Terminal [IN2] <-- [BLUE] Wire from ELEGOO ESP32 Terminal [D27]
+   - Terminal [COM] <-- [RED] Wire from [Soldered 5V Power Bus Rail]
+   - Terminal [NO]  --> [BLUE] Wire outputs +5.0V DC to Circulation Pump Relay / SSR-40DA [Pin 3 DC+]
+
+Victron Orion 48V-to-12V Smart Charger (Direct 1-Wire Control):
+   - Remote Pin [H] <-- [BLUE] Wire from ELEGOO ESP32 Terminal [D4]
+   - Remote Pin [L] <-- [BLACK] Wire to [Soldered Common Ground Bus Rail]

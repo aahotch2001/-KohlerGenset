@@ -48,13 +48,15 @@ Optocoupler Inputs (PC817 Board Outputs - Pure Ground Switching, NO VCC Wire!):
 Relay & Charger Control Outputs:
    - Terminal [D26]    (Left Row 7th down)   --> [BLUE] Wire to Songle Relay 1 [IN1] (Start Command -> Terminals 3 & 4)
    - Terminal [D27]    (Left Row 6th down)   --> [BLUE] Wire to Songle Relay 2 [IN2] (120V Coolant Heater Control)
-   - Terminal [D4]     (Right Row 5th down)  --> [BLUE] Wire to Victron Orion Remote Pin [H] (Direct 3.3V Control)
+   - Terminal [D13]    (Left Row 4th down)   --> [BLUE] Wire to Victron Orion Remote Pin [H] (Direct 3.3V Control)
 
 Sensors & W5500 SPI Ethernet Module:
    - Terminal [D25]    (Left Row 8th down)   --> [YELLOW] Wire to DS18B20 3-Wire Temp Data (+ 4.7k Ω resistor to 3.3V)
    - Terminal [D14]    (Left Row 5th down)   --> W5500 SPI Ethernet Module [SCLK] (Clock Line)
    - Terminal [D23]    (Right Row 15th down) --> W5500 SPI Ethernet Module [MOSI] (Data Out Line)
+   - Terminal [D12]    (Left Row 3rd down)   --> W5500 SPI Ethernet Module [MISO] (Data In Line)
    - Terminal [D5]     (Right Row 8th down)  --> W5500 SPI Ethernet Module [SCS / CS] (Chip Select Line)
+   - Terminal [D4]     (Right Row 5th down)  --> W5500 SPI Ethernet Module [RST] (Hardware Reset Line)
 
 --------------------------------------------------------------------------------
 4. DUAL ADS1115 16-BIT PRECISION ADC MODULES SCHEMATIC
