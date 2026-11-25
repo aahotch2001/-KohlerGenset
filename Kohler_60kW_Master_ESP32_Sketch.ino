@@ -324,7 +324,7 @@ void setup() {
   IPAddress dns(192, 168, 68, 1);
 
   Serial.println("Initializing W5500 Hardwired Cat6 Ethernet (IP: 192.168.68.199)...");
-  Ethernet.begin(mac, ip, dns, gateway, subnet);
+  Ethernet.begin(mac, ip);
 
   Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
   Serial.println(Ethernet.localIP());
