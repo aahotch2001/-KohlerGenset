@@ -302,7 +302,9 @@ void setup() {
   chargerOffVolts       = prefs.getFloat("chgOffV", 13.8);
   chargerMaxRunMinutes  = prefs.getULong("chgMaxM", 120);
 
-  lifetimeGallonsBurned = prefs.getFloat("lifetimeFuel", 0.0);
+  // Reset Lifetime Fuel Gallons on test calibration
+  prefs.putFloat("lifetimeFuel", 0.0);
+  lifetimeGallonsBurned = 0.0;
 
   // Configure Relays & Victron Control Pins
   pinMode(RELAY_START_PIN, OUTPUT);

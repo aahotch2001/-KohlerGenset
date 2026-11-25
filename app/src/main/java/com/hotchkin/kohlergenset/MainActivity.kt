@@ -1057,6 +1057,18 @@ fun GeneratorAppScreen() {
                         )
 
                         HorizontalDivider(color = Color(0xFF333333))
+                        Button(
+                            onClick = {
+                                lifetimeFuelGal = "0.0"
+                                addLog("Lifetime Fuel Counter Reset to 0.0 Gal")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3E2723)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("RESET LIFETIME FUEL LOGS", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                        }
+
+                        HorizontalDivider(color = Color(0xFF333333))
                         // Push Notifications Master Toggle Switch
                         Row(
                             modifier = Modifier.fillMaxWidth(),
