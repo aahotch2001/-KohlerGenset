@@ -1312,25 +1312,29 @@ class GensetMqttService : Service() {
     }
 
     private fun startForegroundServiceNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "genset_service_channel",
-                "Genset Background Monitor",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    "genset_service_channel",
+                    "Genset Background Monitor",
+                    NotificationManager.IMPORTANCE_LOW
+                )
+                val manager = getSystemService(NotificationManager::class.java)
+                manager?.createNotificationChannel(channel)
+            }
+
+            val notification = NotificationCompat.Builder(this, "genset_service_channel")
+                .setContentTitle("Kohler Genset Monitor")
+                .setContentText("24/7 Low-Battery Generator Guard Active")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .build()
+
+            startForeground(1001, notification)
+        } catch (e: Exception) {
+            e.printStackTrace() // Safely catches ForegroundServiceStartNotAllowedException on Android 14+!
         }
-
-        val notification = NotificationCompat.Builder(this, "genset_service_channel")
-            .setContentTitle("Kohler Genset Monitor")
-            .setContentText("24/7 Low-Battery Generator Guard Active")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .build()
-
-        startForeground(1001, notification)
     }
 
     private fun connectBackgroundMqtt() {
@@ -1436,11 +1440,15 @@ class GensetMqttService : Service() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val serviceIntent = Intent(context, GensetMqttService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
+            try {
+                val serviceIntent = Intent(context, GensetMqttService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
