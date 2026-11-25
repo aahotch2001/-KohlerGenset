@@ -12,8 +12,8 @@ Preferences prefs;
 // 1. ELEGOO ESP-32 USB-C BOARD & DUAL NETWORK CONFIG
 // =================================================================
 // Wi-Fi Credentials (Connects as automatic backup if Ethernet is unplugged)
-const char* WIFI_SSID     = "YOUR_WIFI_NAME";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* WIFI_SSID     = "Hotchkin";
+const char* WIFI_PASSWORD = "aaronjulie";
 
 // Local Mosquitto Broker Details (Target IP: 192.168.68.91)
 const char* MQTT_SERVER   = "192.168.68.91";
@@ -316,19 +316,29 @@ void setup() {
   pinMode(DS18B20_TEMP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
 
-  // Initialize W5500 SPI Ethernet Module on Pins D14 (SCLK), D23 (MOSI), D12 (MISO), D5 (CS)
+  // Initialize W5500 SPI Ethernet Module with INSTANT Static IP Assignment!
   SPI.begin(W5500_SCLK_PIN, W5500_MISO_PIN, W5500_MOSI_PIN, W5500_CS_PIN);
   Ethernet.init(W5500_CS_PIN);
+
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-  if (Ethernet.begin(mac) != 0) {
-    w5500Present = true;
-    client.setClient(ethClient);
-    Serial.print("W5500 Ethernet Connected! IP Address: ");
-    Serial.println(Ethernet.localIP());
-  } else {
-    Serial.println("W5500 Ethernet link disconnected or searching. Enabling Wi-Fi backup...");
+  IPAddress ip(192, 168, 68, 199);
+  IPAddress gateway(192, 168, 68, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  IPAddress dns(192, 168, 68, 1);
+
+  Serial.println("Initializing W5500 Hardwired Ethernet (IP: 192.168.68.199)...");
+  Ethernet.begin(mac, ip, dns, gateway, subnet);
+
+  if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+    Serial.println("WARNING: W5500 SPI Ethernet module not detected on D14/D23/D12/D5!");
+    Serial.println("Enabling Wi-Fi Backup Connection to SSID 'Hotchkin'...");
     client.setClient(wifiClient);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  } else {
+    w5500Present = true;
+    client.setClient(ethClient);
+    Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
+    Serial.println(Ethernet.localIP());
   }
 
   // Initialize DUAL ADS1115 16-Bit I2C ADCs on GPIO 21 (SDA) and GPIO 22 (SCL)
