@@ -12,8 +12,8 @@ Preferences prefs;
 // 1. ELEGOO ESP-32 USB-C BOARD & DUAL NETWORK CONFIG
 // =================================================================
 // Wi-Fi Credentials (Connects as automatic backup if Ethernet is unplugged)
-const char* WIFI_SSID     = "YOUR_WIFI_NAME";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* WIFI_SSID     = "Hotchkin";
+const char* WIFI_PASSWORD = "aaronjulie";
 
 // Local Mosquitto Broker Details (Target IP: 192.168.68.91)
 const char* MQTT_SERVER   = "192.168.68.91";
