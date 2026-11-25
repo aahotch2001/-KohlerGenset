@@ -237,10 +237,10 @@ fun GeneratorAppScreen() {
                     .substringBefore(":")
                 
                 val hostsToTry = mutableListOf<String>()
-                if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
+                if (cleanHost.isNotEmpty() && cleanHost != "100.98.23.73") hostsToTry.add(cleanHost)
                 if ("192.168.68.199" !in hostsToTry) hostsToTry.add("192.168.68.199")
-                if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
                 if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
+                if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
 
                 var lastException: Exception? = null
                 var connectedClient: MqttClient? = null
@@ -252,7 +252,7 @@ fun GeneratorAppScreen() {
                             userName = mqttUsername
                             password = mqttPassword.toCharArray()
                             isCleanSession = true
-                            connectionTimeout = 2 // Fast 2-second timeout per attempt
+                            connectionTimeout = 1 // Ultra-fast 1-second timeout per attempt
                             keepAliveInterval = 30
                         })
                     }
