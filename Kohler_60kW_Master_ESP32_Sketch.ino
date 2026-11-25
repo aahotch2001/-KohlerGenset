@@ -178,6 +178,7 @@ const char* topicChargerSetOffVolts = "kohler/charger-set-off-volts";
 const char* topicChargerSetMaxMins = "kohler/charger-set-max-mins";
 
 bool isGeneratorRunning = false;
+bool manualStopRequested = false;
 bool manualHeaterOn = false;
 bool autoHeaterOn = false;
 bool autoHeaterEnabled = true;
@@ -213,8 +214,8 @@ float currentBurnRateGph = 0.0;
 float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
-float currentWaterTemp = 70.0;
-float currentBlockTemp = 0.0;
+float currentWaterTemp = 140.0;
+float currentBlockTemp = 110.0;
 
 // Hydrostatic Real-Time Transducer Burn Rate Memory
 float prevFuelGallons = -1.0;
@@ -237,17 +238,19 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (String(topic) == topicCommand) {
     if (message == "START") {
+      manualStopRequested = false;
       digitalWrite(RELAY_START_PIN, RELAY_ON); // Engage Start Relay
       crankStartTimeMs = millis();
       runSource = "App Remote Manual";
       client.publish(topicStatus, "CRANKING");
       Serial.println("COMMAND: Engine START Requested -> Relay ENGAGED (CRANKING)");
     } else if (message == "STOP") {
+      manualStopRequested = true;
       digitalWrite(RELAY_START_PIN, RELAY_OFF); // Disengage Start Relay IMMEDIATELY
       runSource = "Stopped";
       isGeneratorRunning = false;
-      client.publish(topicStatus, "STOPPED");
-      Serial.println("COMMAND: Engine STOP Requested -> Relay DISENGAGED (STOPPED)");
+      client.publish(topicStatus, "COOLDOWN");
+      Serial.println("COMMAND: Engine STOP Requested -> Relay DISENGAGED (COOLDOWN)");
     }
   } else if (String(topic) == topicHeaterCmd) {
     manualHeaterOn = (message == "ON");
@@ -436,8 +439,8 @@ void loop() {
     rpmPulseCount = 0;
     interrupts();
 
-    // Calibrated divisor = 45 for exact 1755 RPM / 58.5 Hz actual (from 3630 RPM / 121 Hz raw)
-    currentRpm = (pulses * 60) / 45;
+    // Calibrated divisor = 47 for exact 1758 RPM / 58.6 Hz actual (from 3630 RPM / 121 Hz raw)
+    currentRpm = (pulses * 60) / 47;
 
     // 15-SECOND OVER-CRANK SAFETY PROTECTION
     if (startRelayEngaged && (currentRpm <= 400) && (now - crankStartTimeMs >= MAX_CRANK_TIME_MS)) {
@@ -451,16 +454,17 @@ void loop() {
     String currentStatusStr = "STOPPED";
     if (currentRpm > 400) {
       isGeneratorRunning = true;
-      if (startRelayEngaged || optInverterStart) {
-        currentStatusStr = "RUNNING"; // Displays RUNNING when started by inverter or manual!
-      } else {
+      if (manualStopRequested) {
         currentStatusStr = "COOLDOWN";
+      } else {
+        currentStatusStr = "RUNNING"; // Displays RUNNING whenever RPM > 400!
       }
     } else if (startRelayEngaged) {
       isGeneratorRunning = false;
       currentStatusStr = "CRANKING";
     } else {
       isGeneratorRunning = false;
+      manualStopRequested = false;
       currentStatusStr = "STOPPED";
     }
 
@@ -532,7 +536,7 @@ void loop() {
       }
     }
 
-    // REAL-TIME HYDROSTATIC TRANSDUCER BURN RATE (GPH) CALCULATION
+    // REAL-TIME HYDROSTATIC TRANSDUCER BURN RATE (GPH) CALCULATION WITH EMA SLOSH FILTER
     float currentFuelGallons = (fuelLevelPct / 100.0) * TANK_CAPACITY_GALLONS;
     if (isGeneratorRunning) {
       if (prevFuelGallons < 0.0) {
@@ -544,9 +548,11 @@ void loop() {
         if (elapsedMs >= 60000) { // Measure rolling 1-minute transducer fuel consumption
           float gallonsBurned = prevFuelGallons - currentFuelGallons;
           float hoursElapsed = elapsedMs / 3600000.0;
+          float rawGph = gallonsBurned / hoursElapsed;
 
-          if (gallonsBurned >= 0.0 && gallonsBurned < 10.0) {
-            currentBurnRateGph = gallonsBurned / hoursElapsed; // Measured GPH from Transducer!
+          if (rawGph >= 0.0 && rawGph <= 6.0) {
+            // Smooth 80/20 EMA filter to eliminate liquid sloshing spikes!
+            currentBurnRateGph = (currentBurnRateGph * 0.8) + (rawGph * 0.2);
             sessionGallonsBurned += gallonsBurned;
             lifetimeGallonsBurned += gallonsBurned;
             prefs.putFloat("lifetimeFuel", lifetimeGallonsBurned);
