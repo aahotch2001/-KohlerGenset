@@ -9,12 +9,8 @@
 Preferences prefs;
 
 // =================================================================
-// 1. ELEGOO ESP-32 USB-C BOARD & DUAL NETWORK CONFIG
+// 1. ELEGOO ESP-32 HARDWIRED CAT6 ETHERNET CONFIG
 // =================================================================
-// Wi-Fi Credentials (Connects as automatic backup if Ethernet is unplugged)
-const char* WIFI_SSID     = "Hotchkin";
-const char* WIFI_PASSWORD = "aaronjulie";
-
 // Local Mosquitto Broker Details (Target IP: 192.168.68.91)
 const char* MQTT_SERVER   = "192.168.68.91";
 const int   MQTT_PORT     = 1883;
@@ -142,8 +138,7 @@ float readDS18B20TempF() {
 // 4. HARDWARE OBJECTS & LOCAL KOHLER MQTT TOPICS
 // =================================================================
 EthernetClient ethClient;
-WiFiClient wifiClient;
-PubSubClient client;
+PubSubClient client(ethClient);
 
 Adafruit_ADS1115 ads1; // Address 0x48 (Engine Sensors & Voltages)
 Adafruit_ADS1115 ads2; // Address 0x49 (5 PSI Hydrostatic Fuel Transducer)
@@ -198,7 +193,6 @@ String battHealthStr = "HEALTHY";
 
 bool ads1Present = false;
 bool ads2Present = false;
-bool w5500Present = false;
 String runSource = "Stopped";
 unsigned long lastSensorReadTime = 0;
 unsigned long crankStartTimeMs = 0;
@@ -287,6 +281,9 @@ void setup() {
   Serial.println(" KOHLER 60kW GENSET - ELEGOO ESP32 MASTER CONTROLLER");
   Serial.println("=======================================================");
 
+  // Turn Wi-Fi Radio OFF Completely (100% Hardwired Cat6 Ethernet Only!)
+  WiFi.mode(WIFI_OFF);
+
   // Load Saved Thermostat & Charger Parameters from NVS Flash
   prefs.begin("kohler_cfg", false);
   autoHeaterEnabled     = prefs.getBool("autoEnable", true);
@@ -316,7 +313,7 @@ void setup() {
   pinMode(DS18B20_TEMP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(OPT_RPM_SENSE_PIN), rpmPulseISR, FALLING);
 
-  // Initialize W5500 SPI Ethernet Module with INSTANT Static IP Assignment!
+  // Initialize W5500 SPI Ethernet Module on Pins D14 (SCLK), D23 (MOSI), D12 (MISO), D5 (CS)
   SPI.begin(W5500_SCLK_PIN, W5500_MISO_PIN, W5500_MOSI_PIN, W5500_CS_PIN);
   Ethernet.init(W5500_CS_PIN);
 
@@ -326,20 +323,11 @@ void setup() {
   IPAddress subnet(255, 255, 255, 0);
   IPAddress dns(192, 168, 68, 1);
 
-  Serial.println("Initializing W5500 Hardwired Ethernet (IP: 192.168.68.199)...");
+  Serial.println("Initializing W5500 Hardwired Cat6 Ethernet (IP: 192.168.68.199)...");
   Ethernet.begin(mac, ip, dns, gateway, subnet);
 
-  if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-    Serial.println("WARNING: W5500 SPI Ethernet module not detected on D14/D23/D12/D5!");
-    Serial.println("Enabling Wi-Fi Backup Connection to SSID 'Hotchkin'...");
-    client.setClient(wifiClient);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  } else {
-    w5500Present = true;
-    client.setClient(ethClient);
-    Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
-    Serial.println(Ethernet.localIP());
-  }
+  Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
+  Serial.println(Ethernet.localIP());
 
   // Initialize DUAL ADS1115 16-Bit I2C ADCs on GPIO 21 (SDA) and GPIO 22 (SCL)
   Wire.begin(SDA_PIN, SCL_PIN);
@@ -361,16 +349,11 @@ void setup() {
 }
 
 // =================================================================
-// 7. MQTT RECONNECT LOGIC
+// 7. MQTT RECONNECT LOGIC (HARDWIRED ETHERNET ONLY)
 // =================================================================
 void reconnectMqtt() {
   while (!client.connected()) {
-    if (!w5500Present && WiFi.status() != WL_CONNECTED) {
-      Serial.println("Waiting for Network Connection...");
-      delay(2000);
-      continue;
-    }
-    Serial.print("Connecting to Mosquitto Broker at 192.168.68.91:1883... ");
+    Serial.print("Connecting to Mosquitto Broker at 192.168.68.91:1883 over Cat6 Ethernet... ");
     String clientId = "ELEGOO_Genset_Controller_";
     clientId += String(random(0xffff), HEX);
 
@@ -407,7 +390,7 @@ void loop() {
 
   unsigned long now = millis();
 
-  // Smart Adaptive Telemetry Rate: 1s when running/cranking, 10s when stopped (99% packet/battery saver!)
+  // Smart Adaptive Telemetry Rate: 1s when running/cranking, 10s when stopped
   bool startRelayEngaged = (digitalRead(RELAY_START_PIN) == RELAY_ON);
   unsigned long telemetryInterval = (isGeneratorRunning || startRelayEngaged) ? 1000 : 10000;
 
