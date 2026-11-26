@@ -8,6 +8,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <uMQTTBroker.h>
+#include <ArduinoOTA.h>
 
 Preferences prefs;
 
@@ -299,6 +300,12 @@ void setup() {
   embeddedBroker.init(1883);
   Serial.println("ESP32 Onboard Embedded MQTT Broker ACTIVE on Port 1883 (IP: 192.168.68.199)!");
 
+  // START ARDUINO OVER-THE-AIR (OTA) NETWORK FLASHING SERVICE
+  ArduinoOTA.setHostname("Kohler-Genset-ESP32");
+  ArduinoOTA.setPassword("aaronjulie");
+  ArduinoOTA.begin();
+  Serial.println("Arduino OTA Network Flashing ACTIVE! Upload code over Wi-Fi/Ethernet anytime!");
+
   // Initialize DUAL ADS1115 16-Bit I2C ADCs on GPIO 21 (SDA) and GPIO 22 (SCL)
   Wire.begin(SDA_PIN, SCL_PIN);
   if (ads1.begin(0x48)) { // ADS1115 #1 (Engine Sensors & Voltages)
@@ -315,9 +322,12 @@ void setup() {
 }
 
 // =================================================================
-// 7. MAIN LOOP
+// 8. MAIN LOOP
 // =================================================================
 void loop() {
+  // Handle Over-The-Air Network Code Uploads!
+  ArduinoOTA.handle();
+
   unsigned long now = millis();
 
   // Smart Adaptive Telemetry Rate: 1s when running/cranking, 10s when stopped (99% packet/battery saver!)
