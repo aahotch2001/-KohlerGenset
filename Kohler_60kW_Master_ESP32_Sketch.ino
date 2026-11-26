@@ -65,8 +65,9 @@ DallasTemperature sensors(&oneWire);
 float readDS18B20TempF() {
   sensors.requestTemperatures();
   float tempF = sensors.getTempFByIndex(0);
-  if (tempF <= 0.0 || tempF > 250.0) return 0.0;
-  return tempF;
+  if (tempF <= -40.0 || tempF > 250.0) return 0.0;
+  // Calibrated for 29.0°F actual ambient (from 37.0°F raw)
+  return tempF - 8.0;
 }
 
 // =================================================================
@@ -141,8 +142,8 @@ float currentBurnRateGph = 0.0;
 float sessionGallonsBurned = 0.0;
 float lifetimeGallonsBurned = 0.0;
 int currentRpm = 0;
-float currentWaterTemp = 160.0;
-float currentBlockTemp = 160.0;
+float currentWaterTemp = 29.0;
+float currentBlockTemp = 29.0;
 
 // Hydrostatic Real-Time Transducer Burn Rate Memory
 float prevFuelGallons = -1.0;
@@ -344,7 +345,7 @@ void loop() {
       currentBlockTemp = ds18b20Read; // Read 3-wire digital thermometer on GPIO 25
     } else {
       // Fallback: Interpolate from water temp if digital probe is reading 0
-      currentBlockTemp = (currentWaterTemp > 30.0) ? (currentWaterTemp + 15.0) : 37.0;
+      currentBlockTemp = (currentWaterTemp > 20.0) ? (currentWaterTemp + 2.0) : 29.0;
     }
 
     // Calculate RPM & Frequency from Hardware Interrupt
@@ -407,8 +408,8 @@ void loop() {
       oilPressure = (volts0 - 0.5) * 12.513;
       if (oilPressure < 0 || volts0 < 0.2) oilPressure = 0;
 
-      // Kohler NTC Temp Sender Two-Point Curve (37°F cold ➔ 160.0°F actual hot!)
-      currentWaterTemp = 181.19 - (volts1 * 35.34);
+      // Kohler NTC Temp Sender Two-Point Curve (29°F ambient cold ➔ 145.0°F actual hot!)
+      currentWaterTemp = (259.54 - (volts1 * 54.545)) - 8.0;
       if (volts1 < 0.1 || currentWaterTemp < 0) currentWaterTemp = 0.0;
 
       // Calibrated for 13.15V actual multimeter reading
