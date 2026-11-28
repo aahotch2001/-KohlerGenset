@@ -1,7 +1,6 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <WiFi.h>
-#include <PubSubClient.h>
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include <Preferences.h>
@@ -9,17 +8,11 @@
 Preferences prefs;
 
 // =================================================================
-// 1. ELEGOO ESP-32 DUAL NETWORK CONFIG (ETHERNET + WI-FI BACKUP)
+// 1. ELEGOO ESP-32 STANDALONE ONBOARD MQTT BROKER & CAT6 CONFIG
 // =================================================================
 // Wi-Fi Credentials (Automatic backup if Ethernet cable is unplugged)
 const char* WIFI_SSID     = "Hotchkin";
 const char* WIFI_PASSWORD = "aaronjulie";
-
-// Local Mosquitto Broker Details (Target IP: 192.168.68.91)
-const char* MQTT_SERVER   = "192.168.68.91";
-const int   MQTT_PORT     = 1883;
-const char* MQTT_USER     = "aahotch2001";
-const char* MQTT_PASS     = "aaronjulie";
 
 const float TANK_CAPACITY_GALLONS = 500.0; // 500-Gallon Tank Capacity
 
@@ -60,7 +53,7 @@ void IRAM_ATTR rpmPulseISR() {
   rpmPulseCount++;
 }
 
-// Simple 1-Wire Bit-Bang Temperature Reader for DS18B20 Digital Thermometer on GPIO 25
+// Simple Built-In 1-Wire Bit-Bang Temperature Reader for DS18B20 (Zero External Libraries Needed!)
 float readDS18B20TempF() {
   uint8_t pin = DS18B20_TEMP_PIN;
   pinMode(pin, OUTPUT);
@@ -68,7 +61,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 0.0;
+  if (digitalRead(pin) == HIGH) return -999.0;
   delayMicroseconds(430);
 
   // Write 0xCC (Skip ROM) & 0x44 (Convert T)
@@ -98,7 +91,7 @@ float readDS18B20TempF() {
   delayMicroseconds(500);
   pinMode(pin, INPUT_PULLUP);
   delayMicroseconds(70);
-  if (digitalRead(pin) == HIGH) return 0.0;
+  if (digitalRead(pin) == HIGH) return -999.0;
   delayMicroseconds(430);
 
   uint8_t rcmds[2] = {0xCC, 0xBE};
@@ -134,7 +127,7 @@ float readDS18B20TempF() {
   }
 
   float tempC = (int16_t)tempRaw * 0.0625;
-  if (tempC <= 0.0 || tempC > 125.0) return 0.0;
+  if (tempC < -40.0 || tempC > 125.0) return -999.0;
 
   float rawF = (tempC * 9.0 / 5.0) + 32.0;
   return rawF;
@@ -143,9 +136,8 @@ float readDS18B20TempF() {
 // =================================================================
 // 4. HARDWARE OBJECTS & LOCAL KOHLER MQTT TOPICS
 // =================================================================
-EthernetClient ethClient;
-WiFiClient wifiClient;
-PubSubClient client;
+EthernetServer ethServer(1883); // ESP32 Native Onboard Broker Socket Server
+EthernetClient activeClient;
 
 Adafruit_ADS1115 ads1; // Address 0x48 (Engine Sensors & Voltages)
 Adafruit_ADS1115 ads2; // Address 0x49 (5 PSI Hydrostatic Fuel Transducer)
@@ -221,65 +213,103 @@ float prevFuelGallons = -1.0;
 unsigned long prevFuelTimeMs = 0;
 
 // =================================================================
-// 5. MQTT CALLBACK (Receives Commands & Config from Phone App)
+// 5. NATIVE ESP32 ONBOARD MQTT SERVER SOCKET ENGINE
 // =================================================================
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  String message;
-  for (unsigned int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
-  message.trim();
-
-  Serial.print("MQTT Received [");
+void handleIncomingCommand(String topic, String message) {
+  Serial.print("ESP32 Native Broker Command Received [");
   Serial.print(topic);
   Serial.print("]: ");
   Serial.println(message);
 
-  if (String(topic) == topicCommand) {
+  if (topic == topicCommand) {
     if (message == "START") {
       manualStopRequested = false;
       digitalWrite(RELAY_START_PIN, RELAY_ON); // Engage Start Relay
       crankStartTimeMs = millis();
       runSource = "App Remote Manual";
-      client.publish(topicStatus, "CRANKING");
       Serial.println("COMMAND: Engine START Requested -> Relay ENGAGED (CRANKING)");
     } else if (message == "STOP") {
       manualStopRequested = true;
       digitalWrite(RELAY_START_PIN, RELAY_OFF); // Disengage Start Relay IMMEDIATELY
       runSource = "Stopped";
       isGeneratorRunning = false;
-      client.publish(topicStatus, "COOLDOWN");
       Serial.println("COMMAND: Engine STOP Requested -> Relay DISENGAGED (COOLDOWN)");
     }
-  } else if (String(topic) == topicHeaterCmd) {
+  } else if (topic == topicHeaterCmd) {
     manualHeaterOn = (message == "ON");
-  } else if (String(topic) == topicChargerCmd) {
+  } else if (topic == topicChargerCmd) {
     manualChargerOn = (message == "ON");
-  } else if (String(topic) == topicAutoEnable) {
+  } else if (topic == topicAutoEnable) {
     autoHeaterEnabled = (message == "ON");
     prefs.putBool("autoEnable", autoHeaterEnabled);
-  } else if (String(topic) == topicSetOnTemp) {
+  } else if (topic == topicSetOnTemp) {
     heaterOnTemp = message.toFloat();
     prefs.putFloat("onTemp", heaterOnTemp);
-  } else if (String(topic) == topicSetOffTemp) {
+  } else if (topic == topicSetOffTemp) {
     heaterOffTemp = message.toFloat();
     prefs.putFloat("offTemp", heaterOffTemp);
-  } else if (String(topic) == topicSetMaxMins) {
+  } else if (topic == topicSetMaxMins) {
     heaterMaxRunMinutes = message.toInt();
     prefs.putULong("maxMins", heaterMaxRunMinutes);
-  } else if (String(topic) == topicChargerAutoEnable) {
+  } else if (topic == topicChargerAutoEnable) {
     autoChargerEnabled = (message == "ON");
     prefs.putBool("autoChgEna", autoChargerEnabled);
-  } else if (String(topic) == topicChargerSetOnVolts) {
+  } else if (topic == topicChargerSetOnVolts) {
     chargerOnVolts = message.toFloat();
     prefs.putFloat("chgOnV", chargerOnVolts);
-  } else if (String(topic) == topicChargerSetOffVolts) {
+  } else if (topic == topicChargerSetOffVolts) {
     chargerOffVolts = message.toFloat();
     prefs.putFloat("chgOffV", chargerOffVolts);
-  } else if (String(topic) == topicChargerSetMaxMins) {
+  } else if (topic == topicChargerSetMaxMins) {
     chargerMaxRunMinutes = message.toInt();
     prefs.putULong("chgMaxM", chargerMaxRunMinutes);
   }
+}
+
+void processIncomingMqttSocket(EthernetClient& c) {
+  uint8_t buf[256];
+  int len = c.read(buf, sizeof(buf));
+  if (len <= 0) return;
+
+  uint8_t msgType = buf[0] >> 4;
+  if (msgType == 1) { // CONNECT Packet
+    uint8_t connack[] = {0x20, 0x02, 0x00, 0x00}; // Connection Accepted
+    c.write(connack, 4);
+    Serial.println("Onboard Broker: Phone Connected!");
+  } else if (msgType == 3) { // PUBLISH Packet
+    int topicLen = (buf[2] << 8) | buf[3];
+    String topicStr = "";
+    for (int i = 0; i < topicLen && (4 + i) < len; i++) topicStr += (char)buf[4 + i];
+    int payloadOffset = 4 + topicLen;
+    int payloadLen = len - payloadOffset;
+    String payloadStr = "";
+    for (int i = 0; i < payloadLen && (payloadOffset + i) < len; i++) payloadStr += (char)buf[payloadOffset + i];
+    payloadStr.trim();
+    handleIncomingCommand(topicStr, payloadStr);
+  } else if (msgType == 8) { // SUBSCRIBE Packet
+    uint8_t suback[] = {0x90, 0x03, buf[2], buf[3], 0x00};
+    c.write(suback, 5);
+  } else if (msgType == 12) { // PINGREQ Packet
+    uint8_t pingresp[] = {0xD0, 0x00};
+    c.write(pingresp, 2);
+  }
+}
+
+void publishOnboardTelemetry(const char* topicStr, String payloadStr) {
+  if (!activeClient || !activeClient.connected()) return;
+  int topicLen = strlen(topicStr);
+  int payloadLen = payloadStr.length();
+  int remLen = 2 + topicLen + payloadLen;
+
+  uint8_t header[4];
+  header[0] = 0x30; // PUBLISH QoS 0
+  header[1] = (uint8_t)remLen;
+  header[2] = (uint8_t)((topicLen >> 8) & 0xFF);
+  header[3] = (uint8_t)(topicLen & 0xFF);
+
+  activeClient.write(header, 4);
+  activeClient.write((const uint8_t*)topicStr, topicLen);
+  activeClient.write((const uint8_t*)payloadStr.c_str(), payloadLen);
 }
 
 // =================================================================
@@ -345,15 +375,17 @@ void setup() {
   if (Ethernet.hardwareStatus() == EthernetNoHardware || Ethernet.localIP() == IPAddress(0, 0, 0, 0)) {
     Serial.println("W5500 Ethernet SPI inactive or searching. Enabling Wi-Fi backup ('Hotchkin')...");
     w5500Present = false;
-    client.setClient(wifiClient);
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   } else {
     w5500Present = true;
-    client.setClient(ethClient);
     Serial.print("W5500 Hardwired Ethernet ACTIVE! IP Address: ");
     Serial.println(Ethernet.localIP());
   }
+
+  // START ESP32 NATIVE ONBOARD MQTT BROKER SERVER (PORT 1883)
+  ethServer.begin();
+  Serial.println("ESP32 Native Onboard MQTT Broker Server ACTIVE on Port 1883 (IP: 192.168.68.199)!");
 
   // Initialize DUAL ADS1115 16-Bit I2C ADCs on GPIO 21 (SDA) and GPIO 22 (SCL)
   Wire.begin(SDA_PIN, SCL_PIN);
@@ -368,56 +400,20 @@ void setup() {
     ads2.setGain(GAIN_ONE); // +/- 4.096V range
     Serial.println("ADS1115 #2 (0x49 - 16-Bit Fuel Transducer) Initialized");
   }
-
-  // Setup MQTT Client
-  client.setServer(MQTT_SERVER, MQTT_PORT);
-  client.setCallback(mqttCallback);
 }
 
 // =================================================================
-// 7. MQTT RECONNECT LOGIC
-// =================================================================
-void reconnectMqtt() {
-  while (!client.connected()) {
-    if (!w5500Present && WiFi.status() != WL_CONNECTED) {
-      Serial.println("Waiting for Network Connection...");
-      delay(2000);
-      continue;
-    }
-    Serial.print("Connecting to Mosquitto Broker at 192.168.68.91:1883... ");
-    String clientId = "ELEGOO_Genset_Controller_";
-    clientId += String(random(0xffff), HEX);
-
-    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
-      Serial.println("CONNECTED!");
-      client.subscribe(topicCommand);
-      client.subscribe(topicHeaterCmd);
-      client.subscribe(topicChargerCmd);
-      client.subscribe(topicAutoEnable);
-      client.subscribe(topicSetOnTemp);
-      client.subscribe(topicSetOffTemp);
-      client.subscribe(topicSetMaxMins);
-      client.subscribe(topicChargerAutoEnable);
-      client.subscribe(topicChargerSetOnVolts);
-      client.subscribe(topicChargerSetOffVolts);
-      client.subscribe(topicChargerSetMaxMins);
-    } else {
-      Serial.print("Failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" (Retrying in 3 seconds)");
-      delay(3000);
-    }
-  }
-}
-
-// =================================================================
-// 8. MAIN LOOP
+// 7. MAIN LOOP
 // =================================================================
 void loop() {
-  if (!client.connected()) {
-    reconnectMqtt();
+  // Listen for incoming Phone App connections to ESP32 Onboard Broker
+  EthernetClient client = ethServer.available();
+  if (client) {
+    activeClient = client;
+    if (activeClient.available() > 0) {
+      processIncomingMqttSocket(activeClient);
+    }
   }
-  client.loop();
 
   unsigned long now = millis();
 
@@ -478,7 +474,7 @@ void loop() {
     // --- A. READ OPTOCOUPLERS & DS18B20 DIGITAL TEMP SENSOR ---
     bool optInverterStart = (digitalRead(OPT_18KPV_PIN) == LOW);
     float ds18b20Read = readDS18B20TempF();
-    if (ds18b20Read > 5.0) {
+    if (ds18b20Read > -50.0 && ds18b20Read != 0.0) {
       currentBlockTemp = ds18b20Read; // Read 3-wire digital thermometer on GPIO 25
     } else {
       // Dynamic Direct Sync: Block Temp follows Water Temp directly!
@@ -498,7 +494,7 @@ void loop() {
     if (startRelayEngaged && (currentRpm <= 400) && (now - crankStartTimeMs >= MAX_CRANK_TIME_MS)) {
       digitalWrite(RELAY_START_PIN, RELAY_OFF); // Disengage start relay for starter protection!
       startRelayEngaged = false;
-      client.publish(topicStatus, "OVERCRANK FAULT");
+      publishOnboardTelemetry(topicStatus, "OVERCRANK FAULT");
       Serial.println("SAFETY FAULT: Starter crank exceeded 15 seconds! Relay DISENGAGED.");
     }
 
@@ -577,7 +573,7 @@ void loop() {
 
     // --- D. COOLANT HEATER THERMOSTAT CONTROL (AUTOMATED FREEZE BLOCKER!) ---
     float activeThermostatTemp = (currentBlockTemp > 1.0) ? currentBlockTemp : currentWaterTemp;
-    if (autoHeaterEnabled && !isGeneratorRunning && activeThermostatTemp > 1.0) {
+    if (autoHeaterEnabled && !isGeneratorRunning && ads1Present && activeThermostatTemp > 1.0) {
       if (activeThermostatTemp <= heaterOnTemp) {
         if (!autoHeaterOn) {
           autoHeaterOn = true;
@@ -625,20 +621,20 @@ void loop() {
     bool finalChargerState = manualChargerOn || autoChargerOn;
     digitalWrite(VICTRON_CHARGER_PIN, finalChargerState ? HIGH : LOW);
 
-    // --- F. PUBLISH TELEMETRY TO MOSQUITTO BROKER ---
-    client.publish(topicStatus, currentStatusStr.c_str());
-    client.publish(topicOil, String(oilPressure, 1).c_str());
-    client.publish(topicTemp, String(currentWaterTemp, 1).c_str());
-    client.publish(topicBlockTemp, String(currentBlockTemp, 1).c_str());
-    client.publish(topicBatt, String(batteryVoltage, 2).c_str());
-    client.publish(topicBattHealth, battHealthStr.c_str());
-    client.publish(topicSolar48v, String(solar48v, 1).c_str());
-    client.publish(topicFuel, String(fuelLevelPct, 0).c_str());
-    client.publish(topicBurnRate, String(currentBurnRateGph, 1).c_str());
-    client.publish(topicLifetime, String(lifetimeGallonsBurned, 1).c_str());
-    client.publish(topicRpm, String(currentRpm).c_str());
-    client.publish(topicHeater, finalHeaterState ? "ON" : "OFF");
-    client.publish(topicCharger, finalChargerState ? "ON" : "OFF");
+    // --- F. PUBLISH TELEMETRY TO EMBEDDED ONBOARD MQTT BROKER ---
+    publishOnboardTelemetry(topicStatus, currentStatusStr);
+    publishOnboardTelemetry(topicOil, String(oilPressure, 1));
+    publishOnboardTelemetry(topicTemp, String(currentWaterTemp, 1));
+    publishOnboardTelemetry(topicBlockTemp, String(currentBlockTemp, 1));
+    publishOnboardTelemetry(topicBatt, String(batteryVoltage, 2));
+    publishOnboardTelemetry(topicBattHealth, battHealthStr);
+    publishOnboardTelemetry(topicSolar48v, String(solar48v, 1));
+    publishOnboardTelemetry(topicFuel, String(fuelLevelPct, 0));
+    publishOnboardTelemetry(topicBurnRate, String(currentBurnRateGph, 1));
+    publishOnboardTelemetry(topicLifetime, String(lifetimeGallonsBurned, 1));
+    publishOnboardTelemetry(topicRpm, String(currentRpm));
+    publishOnboardTelemetry(topicHeater, finalHeaterState ? "ON" : "OFF");
+    publishOnboardTelemetry(topicCharger, finalChargerState ? "ON" : "OFF");
   }
 }
 ```
