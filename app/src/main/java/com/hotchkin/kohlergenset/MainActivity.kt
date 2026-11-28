@@ -238,9 +238,9 @@ fun GeneratorAppScreen() {
                 
                 val hostsToTry = mutableListOf<String>()
                 if (cleanHost.isNotEmpty() && cleanHost != "100.98.23.73") hostsToTry.add(cleanHost)
-                if ("192.168.68.199" !in hostsToTry) hostsToTry.add("192.168.68.199")
                 if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
                 if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
+                if ("192.168.68.199" !in hostsToTry) hostsToTry.add("192.168.68.199")
 
                 var lastException: Exception? = null
                 var connectedClient: MqttClient? = null
