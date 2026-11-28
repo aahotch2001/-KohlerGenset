@@ -135,7 +135,7 @@ fun GeneratorAppScreen() {
     val prefs = remember { context.getSharedPreferences("kohler_settings", Context.MODE_PRIVATE) }
 
     // Mosquitto Broker Settings State (Local Network Broker: 192.168.68.91 | Tailscale: 100.108.173.127)
-    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "100.108.173.127") ?: "100.108.173.127") }
+    var mqttHost by remember { mutableStateOf(prefs.getString("mqtt_host", "192.168.68.91") ?: "192.168.68.91") }
     var mqttUsername by remember { mutableStateOf(prefs.getString("mqtt_user", "aahotch2001") ?: "aahotch2001") }
     var mqttPassword by remember { mutableStateOf(prefs.getString("mqtt_pass", "aaronjulie") ?: "aaronjulie") }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -144,7 +144,7 @@ fun GeneratorAppScreen() {
     LaunchedEffect(Unit) {
         val editor = prefs.edit()
         var updated = false
-        if (mqttHost == "192.168.65.91") {
+        if (mqttHost.contains("100.108.173.127") || mqttHost.contains("100.98.23.73") || mqttHost == "192.168.65.91") {
             mqttHost = "192.168.68.91"
             editor.putString("mqtt_host", "192.168.68.91")
             updated = true
