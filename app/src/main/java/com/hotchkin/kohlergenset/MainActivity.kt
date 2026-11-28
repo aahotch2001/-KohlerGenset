@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -237,7 +238,7 @@ fun GeneratorAppScreen() {
                     .substringBefore(":")
                 
                 val hostsToTry = mutableListOf<String>()
-                if (cleanHost.isNotEmpty() && cleanHost != "100.98.23.73" && cleanHost != "192.168.68.199") hostsToTry.add(cleanHost)
+                if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
                 if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
                 if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
 
@@ -1343,7 +1344,11 @@ class GensetMqttService : Service() {
                 .setOngoing(true)
                 .build()
 
-            startForeground(1001, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(1001, notification)
+            }
         } catch (e: Exception) {
             e.printStackTrace() // Safely catches ForegroundServiceStartNotAllowedException on Android 14+!
         }
@@ -1351,16 +1356,15 @@ class GensetMqttService : Service() {
 
     private fun connectBackgroundMqtt() {
         val prefs = getSharedPreferences("kohler_settings", Context.MODE_PRIVATE)
-        val host = prefs.getString("mqtt_host", "100.108.173.127") ?: "100.108.173.127"
+        val host = prefs.getString("mqtt_host", "192.168.68.91") ?: "192.168.68.91"
         val user = prefs.getString("mqtt_user", "aahotch2001") ?: "aahotch2001"
         val pass = prefs.getString("mqtt_pass", "aaronjulie") ?: "aaronjulie"
 
         val cleanHost = host.trim().removePrefix("tcp://").removePrefix("http://").substringBefore(":")
         val hostsToTry = mutableListOf<String>()
-        if (cleanHost.isNotEmpty() && cleanHost != "100.98.23.73") hostsToTry.add(cleanHost)
-        if ("192.168.68.199" !in hostsToTry) hostsToTry.add("192.168.68.199")
-        if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
+        if (cleanHost.isNotEmpty()) hostsToTry.add(cleanHost)
         if ("192.168.68.91" !in hostsToTry) hostsToTry.add("192.168.68.91")
+        if ("100.108.173.127" !in hostsToTry) hostsToTry.add("100.108.173.127")
 
         Thread {
             for (targetHost in hostsToTry) {
